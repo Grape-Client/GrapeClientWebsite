@@ -21,9 +21,14 @@ const APP = Buffer.concat([Buffer.from('MZ-grape-app-'), crypto.randomBytes(3000
 writeFileSync(join(files, 'grape-setup.exe'), SETUP);
 writeFileSync(join(files, 'Grape.exe'), APP);
 writeFileSync(join(files, 'version.json'), JSON.stringify({ version: '9.9.9' }));
+const STUB_ENC = Buffer.concat([Buffer.from('STUBENC'), crypto.randomBytes(9000)]);
+const DLL_ENC = Buffer.concat([Buffer.from('DLLENC'), crypto.randomBytes(100000)]);
+writeFileSync(join(files, 'stub.enc'), STUB_ENC);
+writeFileSync(join(files, 'dll.enc'), DLL_ENC);
 const env = {
   ...process.env, GRAPE_DATA: data, GRAPE_PORT: String(port), GRAPE_NO_PAGES: '1', GRAPE_DEV: '0',
   GRAPE_SETUP_STUB: join(files, 'grape-setup.exe'), GRAPE_APP_EXE: join(files, 'Grape.exe'), GRAPE_APP_VERSION_FILE: join(files, 'version.json'),
+  GRAPE_STUB_ENC: join(files, 'stub.enc'), GRAPE_DLL_ENC: join(files, 'dll.enc'),
 };
 let server;
 
@@ -384,4 +389,33 @@ test('a form posted from one of this site\'s own pages is let in even when the b
   assert.equal(await post({ Origin: 'https://evil.example', 'Sec-Fetch-Site': 'same-origin' }), 403, 'another site\'s Origin is never trusted');
   assert.equal(await post({ 'Sec-Fetch-Site': 'cross-site' }), 403, 'no Origin, but a browser saying it is another site');
   assert.equal(await post({}), 303, 'a tool with neither header is not a page');
+});
+
+test('the stub jar and the DLL are served only to an active-license session, by name, as their sealed bytes', () => {
+  const run = spawnSync(process.execPath, ['-e', `
+    const core = require(${JSON.stringify(join(root, 'lib', 'core.js'))});
+    const out = {};
+    const resource = (ctx, name) => core.SECURE['/v1/resource'](ctx, { name });
+    const base = { conn: { hwid: 'a'.repeat(64) }, id: 'c0ffeec0ffeec0ff' };
+    const activeCtx = { ...base, user: { plan: 'month', expires: Date.now() + 1e9, uses: 0 }, users: { u: {} }, account: { user: 'u' } };
+    const noLicenseCtx = { ...base, user: { plan: null, expires: 0, uses: 0 }, users: { u: {} }, account: { user: 'u' } };
+    const stub = resource(activeCtx, 'stub');
+    const dll = resource(activeCtx, 'dll');
+    out.stubStatus = stub[0];
+    out.stubBytes = Buffer.from(stub[1].data, 'base64').toString('latin1').slice(0, 7);
+    out.dllStatus = dll[0];
+    out.dllBytes = Buffer.from(dll[1].data, 'base64').toString('latin1').slice(0, 6);
+    out.unknown = resource(activeCtx, 'secrets')[0];
+    out.proto = resource(activeCtx, '__proto__')[0];
+    out.noLicense = resource(noLicenseCtx, 'stub')[0];
+    console.log(JSON.stringify(out));`], { env, encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  const out = JSON.parse(run.stdout.trim().split('\n').pop());
+  assert.equal(out.stubStatus, 200);
+  assert.equal(out.stubBytes, 'STUBENC', 'the sealed stub bytes, unchanged');
+  assert.equal(out.dllStatus, 200);
+  assert.equal(out.dllBytes, 'DLLENC', 'the sealed DLL bytes, unchanged');
+  assert.equal(out.unknown, 400, 'only the names the server knows');
+  assert.equal(out.proto, 400, 'a name that belongs to every object is not a resource');
+  assert.equal(out.noLicense, 403, 'nothing without an active license');
 });
