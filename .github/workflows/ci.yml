@@ -1,0 +1,25 @@
+# Every push and pull request: the server's tests and the website build. (Deploying is not done here: the VPS pulls main
+# itself every minute, tests and builds it again, and only then runs it: deploy/pull-deploy.sh.)
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build

@@ -1,142 +1,76 @@
-# Putting Grape's server on a VPS, with automatic deploys
+# Grape's server on a VPS, with automatic deploys
 
-What you end up with: you push to GitHub, and a minute later the new server is live on your domain. Nothing on your
-own computer has to be running.
+You push to GitHub; within a minute the VPS has tested, built and started the new version. Nothing on your own computer has
+to be running, and GitHub holds no secrets.
 
 ```
-you push -> GitHub Actions: test, build -> rsync over SSH -> VPS: restart -> health check
-                                                               |
-                       internet -> Caddy (https, :443) -> the server (127.0.0.1:8787)
+you push -> GitHub (public repo) <- the VPS asks every minute (grape-pull.timer)
+                                      |  new commit? clone -> npm ci -> npm test -> npm run build   in /opt/grape-build
+                                      |  all passed?  copy to /opt/grape-server, restart, check /v1/health
+internet -> Caddy (https, :443) -> the server (127.0.0.1:8787)
 ```
 
-Two kinds of files go to the VPS in two different ways:
+A commit that fails its tests or its build is **not deployed**: the server keeps running the last good version, and that commit is
+not tried again until there is a newer one. Look at `journalctl -u grape-pull -n 40`.
+
+Two kinds of files reach the VPS in two different ways:
 
 | What | Built where | How it gets there |
 |---|---|---|
-| The server's **code** and the built website | GitHub (the workflow) | automatically, on every push to `main` |
+| The server's **code** and the built website | the VPS | automatically, from GitHub |
 | **Grape.exe, the installer, the agent, the window bundle** | your Windows computer | `scripts\publish-payload.ps1`, when you release a new build |
 
-## 1. Get a VPS and a domain
+## One-time setup
 
-- Any Linux VPS with Ubuntu 22.04/24.04 or Debian 12 and 1 GB of RAM is enough (Hetzner, DigitalOcean, Vultr...).
-- Point a domain at it: an **A record** `grape.example.com -> the VPS's IP`. If the domain is on Cloudflare, set the record to
-  **DNS only** (grey cloud) so Caddy can get its certificate. (You can turn the orange cloud on later: Cloudflare then sits in
-  front of the same server, with SSL mode "Full (strict)". Do not do that if you pin certificates, step 8.)
-
-## 2. Make the deploy key (on your computer)
-
-GitHub needs its own key to log in to the VPS. In PowerShell:
-
-```powershell
-ssh-keygen -t ed25519 -f $HOME\.ssh\grape-deploy -C github-deploy -N '""'
-Get-Content $HOME\.ssh\grape-deploy.pub     # the PUBLIC half: goes on the VPS (step 3)
-Get-Content $HOME\.ssh\grape-deploy         # the PRIVATE half: goes into GitHub (step 5), nowhere else
-```
-
-## 3. Set up the VPS, once
-
-Log in as root (`ssh root@<ip>`), copy this `deploy` folder there (`scp -r deploy root@<ip>:/root/`), then:
-
-```bash
-cd /root/deploy
-DOMAIN=grape.example.com DEPLOY_PUBKEY="ssh-ed25519 AAAA...your public key... github-deploy" sudo -E bash setup-vps.sh
-```
-
-It installs Node 24 and Caddy, makes two users (`grape` runs the server and can only write its data; `deploy` is what GitHub
-logs in as, and as root it may only restart the server), starts the firewall with only SSH, 80 and 443 open, and sets up https for
-your domain. Running it again is safe.
-
-## 4. Put the server code on GitHub (a private repository)
-
-In `D:\DonutClient\server`:
-
-```powershell
-git add -A
-git commit -m "Grape server"
-gh repo create grape-server --private --source . --push     # or create it on github.com and add it as origin
-```
-
-`.gitignore` keeps `data/`, `payload/`, `node_modules/` and `.next/` out: **accounts, keys and secrets never go to GitHub.**
-
-## 5. Give GitHub its secrets
-
-Repository > Settings > Secrets and variables > Actions > New repository secret:
-
-| Secret | Value |
-|---|---|
-| `VPS_HOST` | the VPS's IP or name |
-| `VPS_USER` | `deploy` |
-| `VPS_SSH_KEY` | the whole PRIVATE key file from step 2, including the `-----BEGIN` and `-----END` lines |
-| `VPS_KNOWN_HOSTS` | the output of `ssh-keyscan -t ed25519 <the VPS's IP>`: GitHub then talks to your machine, not to someone pretending to be it |
-| `PUBLIC_URL` | `https://grape.example.com` |
-| `VPS_PORT` | only if SSH is not on 22 |
-
-## 6. First deploy
-
-Push to `main` (or Actions > Deploy > Run workflow). The steps are Test, Build, Upload, Install and restart, Check that it
-answers. When the last one prints `up`, open `https://grape.example.com/v1/health`.
-
-If a step goes red it says where. On the VPS: `journalctl -u grape-server -n 50`.
-
-## 7. Move your data and the payload to the VPS
-
-Your accounts, keys, admin password and the resource key are in `D:\DonutClient\server\data`. Move them as an encrypted backup:
-
-```powershell
-cd D:\DonutClient\server
-$env:GRAPE_BACKUP_PASSWORD = 'a long password you will not forget'
-node server.js backup $HOME\grape.grapebak
-scp $HOME\grape.grapebak deploy@grape.example.com:/tmp/
-```
-
-On the VPS (as root):
-
-```bash
-systemctl stop grape-server
-sudo -u grape env GRAPE_DATA=/var/lib/grape-server GRAPE_BACKUP_PASSWORD='the same password' node /opt/grape-server/server.js restore /tmp/grape.grapebak --force
-shred -u /tmp/grape.grapebak
-systemctl start grape-server
-```
-
-Then send the payload (build the app first: `npm run build` in `D:\Grape`, then `.\sync-payload.ps1`):
-
-```powershell
-.\scripts\publish-payload.ps1 -Target deploy@grape.example.com
-```
-
-## 8. Point everything at the real address
-
-1. **Discord Developer Portal** > your application > OAuth2 > Redirects: add `https://grape.example.com/v1/discord/callback`.
-   Then in `https://grape.example.com/admin-grape` > Settings > Discord: the client id, the secret and the public address.
-2. **Build the app for this server.** It only ever talks to the address it was built with:
-   ```powershell
-   $env:GRAPE_SERVER = 'https://grape.example.com'
-   npm run build                                         # in D:\Grape
-   .\sync-payload.ps1; .\scripts\publish-payload.ps1 -Target deploy@grape.example.com
+1. **Domain:** an A record `grapeclient.com -> the VPS's IP` (done).
+2. **A key for uploading the payload** (PowerShell): `ssh-keygen -t ed25519 -f $HOME\.ssh\grape-deploy -C grape-deploy -N '""'`.
+   The `.pub` file goes to the VPS in step 3; the private file stays on your computer.
+3. **Set up the VPS** (as root, with this `deploy` folder copied there):
+   ```bash
+   DOMAIN=grapeclient.com REPO=https://github.com/Grape-Client/GrapeClientWebsite.git \
+   DEPLOY_PUBKEY="ssh-ed25519 AAAA... grape-deploy" bash setup-vps.sh
    ```
-   People download the installer from the website: it must be this new one.
-3. Admin page > Settings > Security: the addresses allowed to open the admin page, and the alert webhook.
-
-**Certificate pinning is optional.** Without it the app trusts https as Windows does, which is what browsers do too. With it
-(`node scripts\pin.mjs grape.example.com`, then `$env:GRAPE_PINS = '<pin>'` before the build) the app accepts only your key, but
-the pin is the hash of the certificate's *key*, and Caddy may make a new key when it renews (about every 60 days): programs built
-with the old pin then stop connecting. Use pinning only if you give Caddy a certificate whose key you keep (`tls /path/cert.pem /path/key.pem`,
-made with `certbot --reuse-key`), and pin a spare key as well as the current one (`GRAPE_PINS=<pin1>,<pin2>`). Start without it.
+   It installs Node 24 and Caddy, makes two users (`grape` runs the server and writes only its data; `deploy` builds new versions and,
+   as root, may only restart the server), adds a little swap, opens only SSH, 80 and 443, sets up https and the deployer.
+4. **Move the data** (accounts, keys, admin password, the resource key). Locally:
+   ```powershell
+   cd D:\DonutClient\server
+   $env:GRAPE_BACKUP_PASSWORD = 'a long password'
+   node server.js backup $HOME\grape.grapebak
+   scp -i $HOME\.ssh\grape-deploy $HOME\grape.grapebak deploy@grapeclient.com:/tmp/
+   ```
+   On the VPS (as root): `sudo -u grape env GRAPE_DATA=/var/lib/grape-server GRAPE_BACKUP_PASSWORD='the same' node /opt/grape-build/server.js restore /tmp/grape.grapebak --force`
+   (after the first deploy has made `/opt/grape-build/node_modules` - or use `/opt/grape-server/server.js`), then `shred -u /tmp/grape.grapebak`.
+5. **Start deploying:** `systemctl start grape-pull.timer`. The first run takes a few minutes.
+6. **Discord:** in the Developer Portal > OAuth2 > Redirects add `https://grapeclient.com/v1/discord/callback`. Settings > Discord on
+   `https://grapeclient.com/admin-grape` takes the client id and secret.
+7. **The app:** it only talks to the address it was built with: `npm run release` (in the app's folder) builds for
+   `https://grapeclient.com`. Then `.\sync-payload.ps1` and `.\scripts\publish-payload.ps1 -Target deploy@grapeclient.com`.
 
 ## Day to day
 
 - **Change the server:** edit, `git push`. That is all.
-- **New Grape build:** `npm run build` in `D:\Grape`, `.\sync-payload.ps1`, `.\scripts\publish-payload.ps1 -Target deploy@...`.
+- **New Grape build:** `npm run release` in the app, `.\sync-payload.ps1`, `.\scripts\publish-payload.ps1 -Target deploy@grapeclient.com`.
   Raise "Oldest Version" in Settings > Security when an old build must stop working.
 - **Backups:** daily from cron on the VPS, copied off the machine:
   `GRAPE_BACKUP_PASSWORD=... node /opt/grape-server/server.js backup /root/grape-$(date +%F).grapebak`. Try a restore once.
-- **Logs:** `journalctl -u grape-server -f`, and the admin page's Server Log.
-- **Rolling back:** revert the commit and push; the workflow deploys the older code. A deploy never changes `data/`.
+- **Logs:** `journalctl -u grape-server -f`, `journalctl -u grape-pull -n 40`, and the admin page's Server Log.
+- **Rolling back:** revert the commit and push. A deploy never changes `data/`.
+- **If the repository becomes private:** the VPS needs read access: `ssh-keygen -t ed25519 -f /home/deploy/.ssh/github -N ''` as `deploy`,
+  add its `.pub` as a read-only deploy key (repo > Settings > Deploy keys), and set the clone's remote to `git@github.com:Grape-Client/GrapeClientWebsite.git`.
 
 ## What protects it
 
-Only 22, 80 and 443 are open; the server listens on `127.0.0.1` only; it runs as a user that cannot log in, with a read-only view
-of the code and write access to its data only (the systemd sandbox in `grape-server.service`); GitHub reaches the VPS with a key
-that can only restart the server, and checks the VPS's host key; the repository never holds the data. Secrets that were ever in a
-chat, a screenshot or a commit are burned: the Discord client secret (reset it in the portal), the admin password, `session.key`
-(delete it on the VPS: everyone is signed out), and the resource key (changing it means rebuilding the app).
+Only 22, 80 and 443 are open; the server listens on `127.0.0.1` only; it runs as a user that cannot log in, with a read-only view of
+the code and write access to its data only (the systemd sandbox in `grape-server.service`); new versions are built away from the
+running one, and only after their tests pass; the repository never holds the data. **Turn off password logins for SSH once your key
+works** (`PasswordAuthentication no` in `/etc/ssh/sshd_config.d/`) and change any password that was ever typed into a chat.
+Secrets that were ever in a chat, a screenshot or a commit are burned: the Discord client secret (reset it in the portal), the admin
+password, `session.key` (delete it on the VPS: everyone is signed out), and the resource key (changing it means rebuilding the app).
+
+## Pinning the certificate (optional)
+
+Without it the app trusts https as Windows does, like a browser. With it (`node scripts\pin.mjs grapeclient.com`, then
+`$env:GRAPE_PINS = '<pin>'` before the build) it accepts only your key. The pin is the hash of the certificate's key, and Caddy may
+make a new key when it renews (about every 60 days): apps built with the old pin then stop connecting. Use it only with a
+certificate whose key you keep, and pin a spare key as well. Start without it.

@@ -1,0 +1,15 @@
+# /etc/systemd/system/grape-pull.service  - one check-and-deploy run (started every minute by grape-pull.timer)
+[Unit]
+Description=Deploy the newest Grape server from GitHub, if there is one
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/grape-build
+ExecStart=/opt/grape-build/deploy/pull-deploy.sh
+TimeoutStartSec=900
+Nice=10
+IOSchedulingClass=idle

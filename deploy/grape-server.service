@@ -16,7 +16,7 @@ Environment=GRAPE_PUBLIC_URL=https://grape.example.com
 Environment=GRAPE_TRUST_PROXY=1
 # secrets can come from here instead of the admin page (a file only the grape user reads): GRAPE_DISCORD_CLIENT_SECRET=...
 EnvironmentFile=-/etc/grape-server.env
-ExecStart=/usr/bin/node server.js --prod
+ExecStart=/usr/local/bin/node server.js --prod
 Restart=on-failure
 RestartSec=3
 # what the server does not need, it cannot do
