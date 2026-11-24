@@ -58,9 +58,14 @@ function setup({ ltcRate = 100 } = {}) {
         const to = btc.Address(LTC_NET).encode(btc.OutScript.decode(out.script));
         chain.broadcasts.push({ hex, to, amount: out.amount, inputs: tx.inputsLength });
         const id = 'ab'.repeat(31) + String(chain.broadcasts.length).padStart(2, '0');
-        // what was spent is gone; what was sent arrives (confirmed, for the test)
+        // what was spent is gone; every output arrives at its address (confirmed, for the test) - the change too
         for (const a of Object.keys(chain.utxos)) chain.utxos[a] = [];
-        chain.utxos[to] = [...(chain.utxos[to] || []), { txid: id, vout: 0, value: out.amount, confirmations: 6 }];
+        for (let i = 0; i < tx.outputsLength; i++) {
+          const o = tx.getOutput(i);
+          const a = btc.Address(LTC_NET).encode(btc.OutScript.decode(o.script));
+          chain.utxos[a] = [...(chain.utxos[a] || []), { txid: id, vout: i, value: o.amount, confirmations: 6 }];
+        }
+        chain.broadcasts[chain.broadcasts.length - 1].outputs = tx.outputsLength;
         return id;
       },
     },
@@ -322,5 +327,73 @@ test('the buyer\'s page is told every change of its order (seen, paid), and a ki
     assert.deepEqual(t.credits, [['111', 'week']]);
     await t.pay.kick(o.id);
     assert.equal(t.credits.length, 1, 'a kick after it is paid does nothing');
+  } finally { t.done(); }
+});
+
+test('a coin as a small wallet: balance, totals, the last 30 days, and what came in and went out', async () => {
+  const t = setup({ ltcRate: 100 });
+  try {
+    t.pay.importWallet(SEED);
+    const col = t.pay.collectors().usdt_bsc;
+    t.chain.native[col] = 10n ** 16n;
+    const a = await order(t.pay, 'usdt_bsc', 'week', 2);
+    t.chain.tok[a.address] = { confirmed: 2n * USDT };
+    await t.pay.tick();
+    const b = await t.pay.createOrder({ user: '222', userName: 'Second', plan: 'month', planName: '30 days', coin: 'usdt_bsc', usd: 6 });
+    t.chain.tok[b.address] = { confirmed: 6n * USDT };
+    await t.pay.tick();
+
+    const w = await t.pay.walletState('usdt_bsc');
+    assert.equal(w.address, col);
+    assert.match(w.qr, /^<svg/);
+    assert.equal(w.balance, '8', 'both payments are in the collector');
+    assert.equal(w.gas_low, false);
+    assert.deepEqual([w.totals.received, w.totals.payments, w.totals.usd, w.totals.last30, w.totals.moving, w.totals.sent], ['8', 2, 8, '8', '0', '0']);
+    assert.equal(w.daily.length, 30);
+    assert.equal(w.daily[29].amount, 8, 'today, at the end');
+    assert.equal(w.daily[29].payments, 2);
+    assert.equal(w.daily.slice(0, 29).every((d) => d.amount === 0), true);
+    assert.deepEqual(w.activity.map((x) => [x.kind, x.amount, x.who]).sort((p, q) => Number(p[1]) - Number(q[1])), [['in', '2', 'Buyer'], ['in', '6', 'Second']]);
+    assert.ok(w.activity.every((x) => x.kind === 'in' && x.moved));
+    await assert.rejects(t.pay.walletState('doge'), /Unknown coin/);
+  } finally { t.done(); }
+});
+
+test('sending part of a collector: USDT, and LTC with its change back to the collector; no overspending', async () => {
+  const t = setup({ ltcRate: 100 });
+  try {
+    t.pay.importWallet(SEED);
+    const col = t.pay.collectors().usdt_bsc;
+    t.chain.native[col] = 10n ** 16n;
+    t.chain.tok[col] = { confirmed: 10n * USDT };
+    const friend = '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC';
+    await assert.rejects(t.pay.send('usdt_bsc', 'not-an-address', '1'), /not a BNB Smart Chain/);
+    await assert.rejects(t.pay.send('usdt_bsc', col, '1'), /the collector itself/);
+    await assert.rejects(t.pay.send('usdt_bsc', friend, '11'), /holds 10 USDT/);
+    await assert.rejects(t.pay.send('usdt_bsc', friend, '-1'), /as a number/);
+    await assert.rejects(t.pay.send('usdt_bsc', friend, '0'), /above 0/);
+    await assert.rejects(t.pay.send('usdt_bsc', friend, ''), /Type an amount, or press Max/, 'an empty amount never means everything');
+    await assert.rejects(t.pay.send('usdt_bsc', friend, undefined), /Type an amount/);
+    const sent = await t.pay.send('usdt_bsc', friend, '2.5');
+    assert.deepEqual([sent.amount, sent.to, sent.kind], ['2.5', friend, 'send']);
+    assert.equal(t.chain.tok[friend].confirmed, 25n * 10n ** 17n);
+    assert.equal(t.chain.tok[col].confirmed, 75n * 10n ** 17n, 'the rest stays');
+    const w = await t.pay.walletState('usdt_bsc');
+    assert.equal(w.totals.sent, '2.5');
+    assert.deepEqual([w.activity[0].kind, w.activity[0].amount, w.activity[0].to], ['send', '2.5', friend]);
+    const all = await t.pay.send('usdt_bsc', friend, 'MAX');
+    assert.equal(all.amount, '7.5', 'Max sends everything that is left');
+    assert.equal(t.chain.tok[col].confirmed, 0n);
+
+    const lcol = t.pay.collectors().ltc;
+    t.chain.utxos[lcol] = [{ txid: '33'.repeat(32), vout: 0, value: 5_000_000n, confirmations: 3 }];     // 0.05 LTC
+    const dest = t.pay.keyAt('ltc', 777).address;
+    await assert.rejects(t.pay.send('ltc', dest, '0.06'), /Not enough LTC/);
+    const l = await t.pay.send('ltc', dest, '0.02');
+    assert.equal(l.amount, '0.02');
+    const tx = t.chain.broadcasts.at(-1);
+    assert.equal(tx.outputs, 2, 'the amount, and the change');
+    assert.equal(t.chain.utxos[dest][0].value, 2_000_000n);
+    assert.equal(t.chain.utxos[lcol][0].value, 5_000_000n - 2_000_000n - 10n * (11n + 68n + 34n + 31n), 'the change came back, less the fee');
   } finally { t.done(); }
 });

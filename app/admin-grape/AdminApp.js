@@ -2,7 +2,7 @@
 // The admin page. Built from the Grape window's own pieces (public/grape/style.css and pages.css, copied from the app):
 // the title bar with its page tabs, a page's side bar with its sections, cards of rows, switches, choices, the toasts
 // and the question box. Everything it does goes through /api/admin/<action> (lib/core.js adminApi).
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // ------------------------------------------------------------------ small pieces
 
@@ -977,6 +977,217 @@ function Payments({ section, ui }) {
   );
 }
 
+// ------------------------------------------------------------------ USDT and LTC: each coin as a small wallet
+
+/** "0 / 2 / 4 / 6" style ticks: a clean step (1, 2 or 5 x 10^n) that covers `max` in about four steps. */
+function niceTicks(max) {
+  if (!(max > 0)) return [0, 1];
+  const raw = max / 4;
+  const pow = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 5, 10].map((m) => m * pow).find((s) => s >= raw);
+  const ticks = [];
+  for (let v = 0; v < max + step * 0.999; v += step) ticks.push(Number(v.toPrecision(12)));
+  return ticks;
+}
+const fmtNum = (n) => (Math.abs(n) >= 10000 ? (n / 1000).toFixed(n % 1000 ? 1 : 0) + 'K' : String(Number(n.toFixed(8))));
+
+/** What came in each day of the last 30: one series, so no legend - the title names it. Bars grow from the baseline,
+ *  a 4 px rounded top, a 2 px gap; hovering (or focusing) a day shows its amount and payments. */
+function IncomeChart({ daily, symbol }) {
+  const box = useRef(null);
+  const [w, setW] = useState(640);
+  const [hover, setHover] = useState(null);
+  useEffect(() => {
+    if (!box.current) return undefined;
+    const ro = new ResizeObserver(([e]) => setW(Math.max(280, Math.round(e.contentRect.width))));
+    ro.observe(box.current);
+    return () => ro.disconnect();
+  }, []);
+  const H = 190, L = 44, R = 8, T = 10, B = 26;
+  const plotW = w - L - R, plotH = H - T - B;
+  const ticks = niceTicks(Math.max(...daily.map((d) => d.amount)));
+  const top = ticks[ticks.length - 1] || 1;
+  const slot = plotW / daily.length;
+  const bw = Math.max(2, Math.min(24, slot - 2));
+  const y = (v) => T + plotH - (v / top) * plotH;
+  const dayName = (d) => new Date(d + 'T00:00:00Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const bar = (x, v) => {
+    const h = (v / top) * plotH;
+    if (h <= 0) return null;
+    const r = Math.min(4, h, bw / 2), yt = T + plotH - h, yb = T + plotH;
+    return `M${x},${yb} V${yt + r} Q${x},${yt} ${x + r},${yt} H${x + bw - r} Q${x + bw},${yt} ${x + bw},${yt + r} V${yb} Z`;
+  };
+  const tip = hover === null ? null : daily[hover];
+  return (
+    <div className="wallet-chart" ref={box}>
+      <svg width={w} height={H} role="img" aria-label={`${symbol} received each day, the last 30 days`}>
+        {ticks.map((t) => (
+          <g key={t}>
+            <line x1={L} x2={w - R} y1={y(t)} y2={y(t)} className={t === 0 ? 'wc-base' : 'wc-grid'} />
+            <text x={L - 8} y={y(t) + 4} textAnchor="end" className="wc-tick">{fmtNum(t)}</text>
+          </g>
+        ))}
+        {daily.map((d, i) => {
+          const x = L + i * slot + (slot - bw) / 2;
+          const path = bar(x, d.amount);
+          return (
+            <g key={d.day}>
+              {path && <path d={path} className={'wc-bar' + (hover === i ? ' on' : '')} />}
+              <rect x={L + i * slot} y={T} width={slot} height={plotH} fill="transparent" tabIndex={0}
+                aria-label={`${dayName(d.day)}: ${d.amount} ${symbol}, ${d.payments} payment${d.payments === 1 ? '' : 's'}`}
+                onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(i)} onBlur={() => setHover(null)} />
+              {(daily.length - 1 - i) % 7 === 0 && <text x={L + i * slot + slot / 2} y={H - 6} textAnchor="middle" className="wc-tick">{dayName(d.day)}</text>}
+            </g>
+          );
+        })}
+      </svg>
+      {tip && (
+        <div className="wc-tip" style={{ left: Math.min(w - 150, Math.max(0, L + hover * slot + slot / 2 - 70)), top: Math.max(0, y(tip.amount) - 62) }}>
+          <b>{tip.amount} {symbol}</b>
+          <span>{dayName(tip.day)}  ·  {tip.payments} payment{tip.payments === 1 ? '' : 's'}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CoinWallet({ coin, section, ui }) {
+  const [w, setW] = useState(null);
+  const [to, setTo] = useState('');
+  const [amount, setAmount] = useState('');
+  const [all, setAll] = useState(false);              // Max was pressed: send everything, whatever the shown number rounds to
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState('');
+
+  const load = useCallback(() => call('wallet', { coin }).then(setW).catch((e) => ui.toast(e.message)), [coin, ui]);
+  useEffect(() => {
+    setW(null);
+    load();
+    const t = setInterval(load, 15000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  if (!w) return <p className="mc-none">Loading...</p>;
+  const sym = w.symbol;
+  if (!w.wallet) return (<><h2>{w.name}</h2><p className="admin-hint">There is no payment wallet yet. Make it in Payments &gt; Wallet.</p></>);
+  const copy = async (text) => { if (await copyText(text)) ui.toast('Address copied', 'ok'); else ui.toast('Could not copy: select it and copy it yourself.'); };
+  const usd = (amt) => (w.rate > 0 ? '≈ $' + (Number(amt || 0) * w.rate).toFixed(2) : '');
+
+  if (section === 'activity') {
+    return (
+      <>
+        <h2>{sym} Activity</h2>
+        {!w.activity.length ? <p className="mc-none">Nothing yet. Payments and cash-outs show here.</p> : (
+          <div className="mc-card set-card">
+            {w.activity.map((a, i) => (
+              <Row key={i} icon={a.kind === 'in' ? 'arrow-down-left' : 'arrow-up-right'}
+                title={(a.kind === 'in' ? '+' : '-') + a.amount + ' ' + sym + (a.kind === 'in' ? `  ·  ${a.who}  ·  ${a.plan}` : a.kind === 'send' ? '  ·  sent' : a.auto ? '  ·  auto cash-out' : '  ·  cash-out')}
+                sub={timeOf(a.at) + (a.kind === 'in' ? (a.moved ? '  ·  in the wallet' : a.sweep_error ? '  ·  not moved yet: ' + a.sweep_error : '  ·  moving to the wallet') : '  ·  to ' + short(a.to))}>
+                <b className={'set-value ' + (a.kind === 'in' ? 'good' : '')}>{a.kind === 'in' ? 'Received' : 'Sent'}</b>
+                <a className="mc-get" href={a.link} target="_blank" rel="noreferrer">View</a>
+              </Row>
+            ))}
+          </div>
+        )}
+      </>
+    );
+  }
+
+  if (section === 'send') {
+    const send = () => setBusy('send') || (async () => {
+      try {
+        const amt = all ? 'max' : amount;
+        if (!(await ui.confirm({ icon: 'arrow-up-right', title: 'Send ' + sym, text: `Send ${all ? 'everything (' + w.balance + ' ' + sym + ')' : amount + ' ' + sym} to ${to}? This cannot be undone.`, ok: 'Send', danger: true }))) return;
+        const out = await call('wallet-send', { coin, to, amount: amt, password });
+        ui.toast(`Sent ${out.amount} ${out.symbol}`, 'ok');
+        setAmount(''); setAll(false); setPassword('');
+        load();
+      } catch (e) { ui.toast(e.message); } finally { setBusy(''); }
+    })();
+    return (
+      <>
+        <h2>Send {sym}</h2>
+        <div className="mc-card set-card">
+          <Row icon="wallet" title={'Available  ·  ' + (w.error ? '-' : (coin === 'ltc' ? w.confirmed : w.balance) + ' ' + sym)} sub={coin === 'ltc' ? 'Confirmed LTC only; the network fee is taken on top' : 'The gas is paid in BNB by the wallet: ' + (w.gas || '0') + ' BNB'} />
+          <Field icon="arrow-up-right" title="To" sub={coin === 'ltc' ? 'A Litecoin address: ltc1..., L... or M...' : 'A BEP20 address (0x...) on BNB Smart Chain'} value={to} onChange={setTo} placeholder={coin === 'ltc' ? 'ltc1q...' : '0x...'} />
+          {w.payout && <Row icon="check" title="Your main address" sub={w.payout}><button className="mc-get" onClick={() => setTo(w.payout)}>Use it</button></Row>}
+          <Row icon="layers" title={'Amount (' + sym + ')'} sub={all ? 'Everything in the wallet' : 'How much to send'}>
+            <div className="admin-count">
+              <input className="set-input" value={all ? 'Everything' : amount} inputMode="decimal" placeholder="0.00" onChange={(e) => { setAll(false); setAmount(e.target.value.replace(/[^0-9.]/g, '')); }} />
+              <button className="mc-get" onClick={() => { setAll(true); setAmount(''); }}>Max</button>
+            </div>
+          </Row>
+          <Field icon="eye-off" title="Admin Password" sub="Needed to send" type="password" value={password} onChange={setPassword} />
+        </div>
+        <div className="admin-actions"><button className="mc-get admin-primary" disabled={busy === 'send' || !to || (!all && !Number(amount)) || !password} onClick={send}>{busy === 'send' ? 'Sending...' : 'Send'}</button></div>
+        <p className="admin-hint">Check the address: a blockchain payment cannot be undone. {coin === 'usdt_bsc' ? 'Send only to a BNB Smart Chain (BEP20) address.' : ''}</p>
+      </>
+    );
+  }
+
+  // the wallet itself
+  const cashOut = () => setBusy('cash') || (async () => {
+    try {
+      if (!(await ui.confirm({ icon: 'arrow-up-right', title: 'Cash out ' + sym, text: `Send everything to your main address ${w.payout}?`, ok: 'Cash out' }))) return;
+      const out = await call('payments-cash-out', { coin });
+      ui.toast(out.nothing ? 'The wallet is empty: nothing to send' : `Sent ${out.amount} ${out.symbol}`, out.nothing ? undefined : 'ok');
+      load();
+    } catch (e) { ui.toast(e.message); } finally { setBusy(''); }
+  })();
+  const t = w.totals;
+  return (
+    <>
+      <h2>{w.name}</h2>
+      <div className="wallet-hero">
+        <div>
+          <span>Balance</span>
+          <b>{w.error ? '-' : w.balance} <i>{sym}</i></b>
+          <span>{w.error ? 'Could not read it: ' + w.error : [usd(w.balance), coin === 'ltc' && w.confirmed !== w.balance ? w.confirmed + ' LTC confirmed' : '', Number(t.moving) > 0 ? '+' + t.moving + ' ' + sym + ' on its way in' : ''].filter(Boolean).join('  ·  ')}</span>
+        </div>
+        <div className="wallet-hero-actions">
+          <button className="mc-get admin-primary" disabled={!w.payout || busy === 'cash'} onClick={cashOut} title={w.payout ? '' : 'Set your main address in Payments > Settings'}>{busy === 'cash' ? 'Sending...' : 'Cash out'}</button>
+        </div>
+      </div>
+      {coin === 'usdt_bsc' && !w.error && (
+        <div className={'wallet-gas' + (w.gas_low ? ' low' : '')}>
+          <Ic name={w.gas_low ? 'triangle-alert' : 'zap'} />
+          <span>Gas: <b>{w.gas} BNB</b>{w.gas_low ? '  ·  low: send a little BNB (BEP20) to the address below, it pays the gas of every payment' : ''}</span>
+        </div>
+      )}
+      <div className="home-grid">
+        <div className="home-card"><span>Received, all time</span><b>{t.received} {sym}</b></div>
+        <div className="home-card right"><span>Last 30 days</span><b>{t.last30} {sym}</b></div>
+        <div className="home-card"><span>Payments</span><b>{t.payments}  <small>${t.usd.toFixed(2).replace(/\.00$/, '')}</small></b></div>
+        <div className="home-card right"><span>Sent out</span><b>{t.sent} {sym}</b></div>
+      </div>
+      <h6>RECEIVED, LAST 30 DAYS</h6>
+      <div className="mc-card set-card wallet-card"><IncomeChart daily={w.daily} symbol={sym} /></div>
+      <details className="wallet-table">
+        <summary>Show as a table</summary>
+        <table>
+          <thead><tr><th>Day</th><th>{sym}</th><th>Payments</th></tr></thead>
+          <tbody>{w.daily.filter((d) => d.amount > 0).reverse().map((d) => <tr key={d.day}><td>{d.day}</td><td>{d.amount}</td><td>{d.payments}</td></tr>)}</tbody>
+        </table>
+        {!w.daily.some((d) => d.amount > 0) && <p className="mc-none">Nothing received in the last 30 days.</p>}
+      </details>
+      <h6>RECEIVE</h6>
+      <div className="mc-card set-card wallet-receive">
+        {w.qr && <div className="wallet-qr" aria-hidden="true" dangerouslySetInnerHTML={{ __html: w.qr }} />}
+        <div>
+          <span className="wallet-label">{w.network}</span>
+          <code className="admin-key">{w.address}</code>
+          <p>{coin === 'usdt_bsc' ? 'Every USDT payment is moved here by itself. Send BNB here to pay the gas.' : 'Every Litecoin payment is moved here by itself.'}</p>
+          <div className="wallet-links">
+            <button className="mc-get" onClick={() => copy(w.address)}>Copy</button>
+            <a className="mc-get" href={w.explorer} target="_blank" rel="noreferrer">View</a>
+          </div>
+        </div>
+      </div>
+      <p className="admin-hint">{w.payout ? `Cash out sends everything to your main address ${short(w.payout)}${w.auto ? `, and happens by itself once ${w.min_cashout} ${sym} has gathered` : ''}.` : 'Set your main address in Payments > Settings to cash out.'}</p>
+    </>
+  );
+}
+
 // ------------------------------------------------------------------ the window
 
 const PAGES = {
@@ -984,6 +1195,8 @@ const PAGES = {
   keys: { title: 'Keys', icon: 'sparkles', sections: [['make', 'Make Keys', 'plus'], ['list', 'All Keys', 'layout-list']] },
   users: { title: 'Users', icon: 'earth', sections: [['users', 'Users', 'earth'], ['computers', 'Computers', 'cpu']] },
   installers: { title: 'Installers', icon: 'download', sections: [['make', 'Make Installer', 'plus'], ['list', 'All Installers', 'layout-list']] },
+  usdt: { title: 'USDT', icon: 'wallet', sections: [['wallet', 'Wallet', 'wallet'], ['activity', 'Activity', 'layout-list'], ['send', 'Send', 'arrow-up-right']] },
+  ltc: { title: 'LTC', icon: 'wallet', sections: [['wallet', 'Wallet', 'wallet'], ['activity', 'Activity', 'layout-list'], ['send', 'Send', 'arrow-up-right']] },
   payments: { title: 'Payments', icon: 'zap', sections: [['overview', 'Overview', 'layers'], ['orders', 'Orders', 'layout-list'], ['prices', 'Prices', 'pencil'], ['settings', 'Settings', 'sliders-horizontal'], ['wallet', 'Wallet', 'eye-off']] },
   settings: { title: 'Settings', icon: 'settings', sections: [['discord', 'Discord', 'discord'], ['website', 'Website', 'download'], ['security', 'Security', 'triangle-alert'], ['password', 'Admin Password', 'eye-off']] },
 };
@@ -992,7 +1205,7 @@ export default function AdminApp({ setup }) {
   const ui = useDialogs();
   const [auth, setAuth] = useState(null);          // {ready, authed}
   const [page, setPage] = useState('home');
-  const [sections, setSections] = useState({ home: 'overview', keys: 'make', users: 'users', installers: 'make', payments: 'overview', settings: 'discord' });
+  const [sections, setSections] = useState({ home: 'overview', keys: 'make', users: 'users', installers: 'make', payments: 'overview', usdt: 'wallet', ltc: 'wallet', settings: 'discord' });
   const [narrow, setNarrow] = useState(false);
   const [plans, setPlans] = useState([]);
   const [overview, setOverview] = useState(null);
@@ -1051,6 +1264,8 @@ export default function AdminApp({ setup }) {
           {page === 'keys' && <Keys section={section} plans={plans} ui={uiApi} made={made} setMade={setMade} />}
           {page === 'users' && <Users section={section} plans={plans} ui={uiApi} />}
           {page === 'payments' && <Payments section={section} ui={uiApi} />}
+          {page === 'usdt' && <CoinWallet key="usdt" coin="usdt_bsc" section={section} ui={uiApi} />}
+          {page === 'ltc' && <CoinWallet key="ltc" coin="ltc" section={section} ui={uiApi} />}
           {page === 'installers' && <Installers section={section} ui={uiApi} link={installerLink} setLink={setInstallerLink} />}
           {page === 'settings' && <Settings section={section} plans={plans} ui={uiApi} />}
         </div>
