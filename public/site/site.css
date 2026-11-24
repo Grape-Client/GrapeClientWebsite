@@ -119,11 +119,11 @@ img { display: block; max-width: 100%; }
 .perks li { display: flex; align-items: center; gap: 8px; color: #dcdcdc; font-size: 13.5px; font-weight: 500; }
 .perks .ic { width: 15px; height: 15px; color: #a9a9a9; }
 .plans .lead { margin: 16px auto 0; max-width: 580px; color: var(--soft); font-size: 16.5px; }
-.plan-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 48px; text-align: left; }
+.plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; max-width: 780px; margin: 48px auto 0; text-align: left; }
 .plan { display: flex; flex-direction: column; padding: 26px; border-radius: 20px; background: var(--raised); border: 1px solid #1f1f1f; }
 .plan.pick { background: var(--violet); border-color: #3a2f66; }
 .plan .name { font-size: 14px; font-weight: 600; color: var(--soft); }
-.plan .price { margin-top: 10px; font-size: 40px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
+.plan .price { margin-top: 10px; font-size: 44px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
 .plan .length { margin-top: 4px; color: var(--muted); font-size: 13px; }
 .plan .btn { margin-top: 24px; width: 100%; height: 44px; font-size: 13.5px; }
 .note { margin: 22px 0 0; color: var(--quiet); font-size: 12.5px; text-align: center; }
@@ -258,6 +258,11 @@ button.dl-row:disabled { opacity: 0.5; cursor: default; }
 .dl-words span { color: var(--muted); font-size: 12.5px; line-height: 1.5; }
 .dl-words a { color: #e0e0e0; text-underline-offset: 3px; }
 .dl-row > .ic { flex: none; width: 16px; height: 16px; color: #8d8d8d; }
+.dl-row.redeem { cursor: default; }
+.dl-row.redeem .btn { flex: none; height: 38px; padding: 0 16px; font-size: 13px; border-radius: 11px; }
+.dl-row.redeem .btn:disabled { background: #2a2a2a; color: #7d7d7d; cursor: default; }
+.dl-row.redeem input { width: 100%; margin-top: 4px; height: 36px; padding: 0 12px; border: 1px solid #2c2c2c; border-radius: 10px; background: #141414; color: var(--white); font: 500 13px/1 Consolas, "Cascadia Mono", monospace; letter-spacing: 0.5px; }
+.dl-row.redeem input:focus-visible { outline: 2px solid #6b6b6b; outline-offset: 1px; }
 .dl-error { margin: 12px 0 0; padding: 12px 14px; border-radius: 12px; background: #2a1618; color: #ff9fa3; font-size: 13.5px; line-height: 1.55; }
 .dl-small { margin: 12px 0 0; text-align: center; color: var(--quiet); font-size: 12.5px; }
 .dl-small a { color: var(--soft); text-underline-offset: 3px; }

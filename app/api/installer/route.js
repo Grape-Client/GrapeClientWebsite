@@ -1,4 +1,5 @@
-// What the download popup asks: GET = who is logged in and what they may do; POST = make an installer for them.
+// What the download popup asks: GET = who is logged in and what they may do; POST = make an installer for them, or
+// POST {action: 'redeem', code} = redeem a key for them (only an account with time on it gets an installer).
 // All of it is done by the server's core (lib/core.js siteInstaller), the same instance server.js runs.
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +21,13 @@ export async function POST(request) {
     if (origin && new URL(origin).host !== request.headers.get('host')) return Response.json({ error: 'Not from this site.' }, { status: 403 });
   } catch {
     return Response.json({ error: 'Not from this site.' }, { status: 403 });
+  }
+  let body = {};
+  try { body = await request.json(); } catch { /* no body: it is "make" */ }
+  const grape = globalThis.grape;
+  if (grape && body && body.action === 'redeem') {
+    const out = grape.siteRedeem(request.cookies.get(grape.COOKIES.site)?.value, typeof body.code === 'string' ? body.code.slice(0, 80) : '', request.headers.get('x-grape-ip') || '?');
+    return Response.json(out.body, { status: out.status, headers: { 'Cache-Control': 'no-store' } });
   }
   return answer(request, 'make');
 }

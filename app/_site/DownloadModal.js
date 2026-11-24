@@ -18,7 +18,7 @@ export function DownloadButton({ className, children, disabled }) {
 const Ic = ({ name }) => <i className="ic" style={{ '--i': `url(/grape/icons/${name}.svg)` }} />;
 const WindowsMark = () => (
   <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-    <path d="M3 5.6 10.4 4.6v6.9H3zM11.6 4.4 21 3v8.5h-9.4zM3 12.5h7.4v6.9L3 18.4zM11.6 12.5H21V21l-9.4-1.3z" fill="currentColor" />
+    <path d="M2 2h9.5v9.5H2zM12.5 2H22v9.5h-9.5zM2 12.5h9.5V22H2zM12.5 12.5H22V22h-9.5z" fill="currentColor" />
   </svg>
 );
 
@@ -28,6 +28,8 @@ export function DownloadModal() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [link, setLink] = useState('');              // the installer's address once it was made
+  const [key, setKey] = useState('');                // a key being typed in
+  const [redeeming, setRedeeming] = useState(false);
   const dialog = useRef(null);
   const closeButton = useRef(null);
   const before = useRef(null);
@@ -74,6 +76,26 @@ export function DownloadModal() {
     };
   }, [open, close]);
 
+  /** GRAPE-XXXXX-XXXXX-XXXXX-XXXXX as it is typed: letters and digits only, in groups of five. */
+  const shape = (text) => {
+    const body = text.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 25);
+    return body.match(/.{1,5}/g)?.join('-') || '';
+  };
+  const redeem = async (e) => {
+    e.preventDefault();
+    setRedeeming(true);
+    setError('');
+    try {
+      const r = await fetch('/api/installer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'redeem', code: key }) });
+      const j = await r.json().catch(() => ({ error: 'The server did not answer. Try again.' }));
+      if (!r.ok) setError(j.error || 'That did not work. Try again.');
+      else { setState(j); setKey(''); }
+    } catch {
+      setError('Could not reach the server. Check your connection and try again.');
+    }
+    setRedeeming(false);
+  };
+
   const download = async () => {
     setBusy(true);
     setError('');
@@ -82,7 +104,7 @@ export function DownloadModal() {
       const j = await r.json().catch(() => ({ error: 'The server did not answer. Try again.' }));
       if (!r.ok) {
         setError(j.error || 'That did not work. Try again.');
-        if (j.login || j.quota) setState((s) => ({ ...(s || {}), ...j }));
+        if (j.login || j.quota || j.needs_time) setState((s) => ({ ...(s || {}), ...j }));
       } else {
         setLink(j.url);
         if (j.quota) setState((s) => ({ ...(s || {}), quota: j.quota }));
@@ -100,6 +122,15 @@ export function DownloadModal() {
   const size = state && state.size ? (state.size / 1048576).toFixed(1) + ' MB' : '';
   const facts = [state && state.version && 'Version ' + state.version, size, 'works once, on one computer'].filter(Boolean).join('  ·  ');
   const left = state && state.quota && state.quota.limit > 0 ? state.quota.left : null;
+  const active = !!(user && user.active);
+  const needsTime = !!(user && !user.active && !user.revoked);
+  const timeLeft = (u) => {
+    if (!u.active) return u.revoked ? 'Switched off' : 'No time left';
+    if (u.expires === null) return 'No end date';
+    const ms = u.expires - Date.now();
+    const d = Math.floor(ms / 864e5), h = Math.max(1, Math.floor(ms / 36e5) % 24);
+    return (d > 0 ? d + ' day' + (d === 1 ? '' : 's') : h + ' hour' + (h === 1 ? '' : 's')) + ' left';
+  };
 
   return (
     <div className="dl-modal">
@@ -117,7 +148,7 @@ export function DownloadModal() {
         </div>
 
         <p className="dl-label">Get your installer</p>
-        <p className="dl-hint">Two quick steps. The installer is made for you and works once.</p>
+        <p className="dl-hint">Log in with Discord, and have time on your account. The installer is made for you and works once.</p>
 
         <div className="dl-rows">
           {!state && !error ? (
@@ -125,7 +156,7 @@ export function DownloadModal() {
           ) : user ? (
             <div className="dl-row done">
               <span className="dl-icon">{user.avatar ? <img src={user.avatar} alt="" /> : <Ic name="check" />}</span>
-              <span className="dl-words"><b>Logged in as {user.name}</b><span>Not you? <a href="/logout">Log out</a></span></span>
+              <span className="dl-words"><b>Logged in as {user.name}</b><span>{timeLeft(user)}. Not you? <a href="/logout">Log out</a></span></span>
               <Ic name="check" />
             </div>
           ) : (
@@ -136,17 +167,28 @@ export function DownloadModal() {
             </a>
           )}
 
+          {needsTime && (
+            <form className="dl-row redeem" onSubmit={redeem}>
+              <span className="dl-icon"><Ic name="sparkles" /></span>
+              <span className="dl-words">
+                <b>Redeem a key</b>
+                <input value={key} onChange={(e) => setKey(shape(e.target.value))} placeholder="GRAPE-XXXXX-XXXXX-XXXXX-XXXXX" maxLength={29} spellcheck="false" autoComplete="off" aria-label="License key" />
+              </span>
+              <button className="btn main" disabled={redeeming || key.replace(/-/g, '').length < 25}>{redeeming ? '...' : 'Redeem'}</button>
+            </form>
+          )}
+
           {link ? (
             <div className="dl-row done">
               <span className="dl-icon"><Ic name="download" /></span>
               <span className="dl-words"><b>Your download is starting</b><span>Not starting? <a href={link}>Download it again</a>. Then run it and log in to Grape.</span></span>
             </div>
           ) : (
-            <button className="dl-row" disabled={!user || busy || !ready} onClick={download}>
+            <button className="dl-row" disabled={!active || busy || !ready} onClick={download}>
               <span className="dl-icon"><WindowsMark /></span>
               <span className="dl-words">
                 <b>{busy ? 'Making your installer...' : ready ? 'Download for Windows' : 'Download coming soon'}</b>
-                <span>{!ready ? 'The installer is not ready yet.' : user ? facts : 'Log in first.'}</span>
+                <span>{!ready ? 'The installer is not ready yet.' : !user ? 'Log in first.' : !active ? (user.revoked ? 'Your account is switched off.' : 'Redeem a key first.') : facts}</span>
               </span>
               <Ic name="chevron-right" />
             </button>
@@ -154,7 +196,7 @@ export function DownloadModal() {
         </div>
 
         {error && <p className="dl-error" role="alert">{error}</p>}
-        {!error && left !== null && user && !link && <p className="dl-small">You can make {left} more installer{left === 1 ? '' : 's'} today.</p>}
+        {!error && left !== null && active && !link && <p className="dl-small">You can make {left} more installer{left === 1 ? '' : 's'} today.</p>}
         <p className="dl-small">By downloading Grape you agree to the <a href="/terms">Terms of Service</a>.</p>
       </div>
     </div>

@@ -7,10 +7,10 @@ export const grape = () => globalThis.grape;
 export const Ic = ({ name }) => <i className="ic" style={{ '--i': `url(/grape/icons/${name}.svg)` }} />;
 export const SiteStyle = () => <link rel="stylesheet" href="/site/site.css" precedence="site" />;
 
-/** The Windows mark, one colour (it takes the colour of the text around it). */
+/** The Windows 11 mark - four equal squares - in one colour (it takes the colour of the text around it). */
 export const WindowsLogo = () => (
   <svg className="winlogo" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-    <path d="M3 5.6 10.4 4.6v6.9H3zM11.6 4.4 21 3v8.5h-9.4zM3 12.5h7.4v6.9L3 18.4zM11.6 12.5H21V21l-9.4-1.3z" fill="currentColor" />
+    <path d="M2 2h9.5v9.5H2zM12.5 2H22v9.5h-9.5zM2 12.5h9.5V22H2zM12.5 12.5H22V22h-9.5z" fill="currentColor" />
   </svg>
 );
 

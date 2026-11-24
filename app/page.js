@@ -40,7 +40,7 @@ const FACTS = [['1.8.9 to 1.21.11', 'Minecraft versions'], ['2', 'Ways to inject
 const PERKS = [['layers', 'Every Grape feature'], ['cpu', 'One computer, movable once a day'], ['discord', 'Logged in with Discord'], ['history', 'Time left is kept']];
 
 const FAQ = [
-  ['How do I get Grape?', 'Press Download for Windows and log in with Discord. The server makes an installer for you: it works once, on the first computer that starts it, downloads Grape, checks it, puts it in place and removes itself.'],
+  ['How do I get Grape?', 'Press Download for Windows, log in with Discord and redeem a key: only an account with time on it can download. The server then makes an installer for you. It works once, on the first computer that starts it, downloads Grape, checks it, puts it in place and removes itself.'],
   ['Can I use my account on two computers?', 'One at a time. Your account is tied to the computer you log in on, and you can move it to another one every 24 hours, from the welcome screen or Settings > Account.'],
   ['How do keys work?', 'A key adds its time to your Discord account, and each key can be used once. Nothing renews by itself: when the time ends, you redeem another key.'],
   ['What happens when my time ends?', 'Grape goes back to its welcome screen, and the rest of the program stays locked until you redeem a key. The time you have left is always kept.'],
@@ -100,12 +100,12 @@ export default async function Landing() {
               <div className={'plan' + (p.id === 'month' ? ' pick' : '')} key={p.id}>
                 <span className="name">{p.name}</span>
                 <span className="price">{site.prices[p.id] || length(p)}</span>
-                <span className="length">{site.prices[p.id] ? length(p) : p.days === null ? 'No end date' : 'Of full access'}</span>
+                <span className="length">{p.days === null ? 'No end date' : 'Of full access'}</span>
                 <a className={'btn ' + (p.id === 'month' ? 'main' : 'quiet')} href={buy} rel="noreferrer">Get a key</a>
               </div>
             ))}
           </div>
-          <p className="note">Keys, not a subscription: nothing renews by itself. Redeem a key in Grape after you log in.</p>
+          <p className="note">Keys, not a subscription: nothing renews by itself. You redeem a key in the download window, or in Grape, after you log in.</p>
         </section>
 
         <section className="faq" id="faq">

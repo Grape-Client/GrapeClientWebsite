@@ -293,16 +293,27 @@ test('a backup opens only with its password and brings every file back', () => {
 
 // ---- the download popup's API, and the daily limit
 
-test('the download popup: log in first, then a few installers a day, and the admin can reset or change the limit', () => {
+test('the download popup: log in, have time on the account, then a few installers a day; the admin can reset or change the limit', () => {
   const user = '555666777888999000';
   writeFileSync(join(data, 'users.json'), JSON.stringify({ [user]: { username: 'popup', global_name: 'Popup', plan: null, expires: 0 } }));
   const run = spawnSync(process.execPath, ['-e', `
     const core = require(${JSON.stringify(join(root, 'lib', 'core.js'))});
     const cookie = core.signCookie('site', ${JSON.stringify(user)}, 1);
     const ask = (action, c = cookie) => core.siteInstaller(c, action, '9.9.9.9');
+    const redeem = (code, c = cookie) => core.siteRedeem(c, code, '9.9.9.9');
     const out = {};
     out.state_anon = ask('state', '');
     out.make_anon = ask('make', '').status;
+    out.redeem_anon = redeem('GRAPE-AAAAA-AAAAA-AAAAA-AAAAA', '').status;
+    // no time on the account: no installer
+    out.no_time = (() => { const r = ask('make'); return { status: r.status, needs_time: r.body.needs_time, active: r.body.user.active }; })();
+    // a key redeemed on the website gives time
+    const [week, month] = [core.ops.makeKeys('week', 1)[0], core.ops.makeKeys('month', 1)[0]];
+    out.bad_key = redeem('GRAPE-AAAAA-AAAAA-AAAAA-AAAAA').status;
+    out.junk_key = redeem('nonsense').status;
+    const good = redeem(week);
+    out.redeemed = { status: good.status, active: good.body.user.active, plan: good.body.user.plan_name };
+    out.key_twice = redeem(week).status;
     out.state_user = ask('state');
     out.makes = [1, 2, 3].map(() => ask('make').status);
     const fourth = ask('make');
@@ -318,13 +329,29 @@ test('the download popup: log in first, then a few installers a day, and the adm
     core.ops.resetInstallerLimits();
     out.url = ask('make').body.url;
     out.bad_action = ask('nonsense').status;
+    // the time runs out, or the account is switched off: no installer
+    const db = JSON.parse(require('fs').readFileSync(${JSON.stringify(join(data, 'users.json'))}, 'utf8'));
+    db[${JSON.stringify(user)}].expires = Date.now() - 1000;
+    require('fs').writeFileSync(${JSON.stringify(join(data, 'users.json'))}, JSON.stringify(db));
+    out.expired = ask('make').status;
+    out.second_key = redeem(month).body.user.active;
+    out.again = core.siteInstaller(cookie, 'make', '8.8.8.8').status;     // another address: one address may only try so often
+    core.ops.user(${JSON.stringify(user)}, 'revoke');
+    const off = ask('make');
+    out.switched_off = { status: off.status, message: off.body.error };
+    out.key_when_off = redeem(core.ops.makeKeys('week', 1)[0]).status;
     console.log(JSON.stringify(out));`], { env, encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
   const out = JSON.parse(run.stdout.trim().split('\n').pop());
   assert.equal(out.state_anon.body.user, null, 'a visitor is not logged in');
   assert.equal(out.state_anon.body.ready, true, 'the installer and Grape are there');
-  assert.equal(out.state_anon.body.quota, null);
   assert.equal(out.make_anon, 401, 'no installer without a login');
+  assert.equal(out.redeem_anon, 401, 'and no key without one');
+  assert.deepEqual(out.no_time, { status: 403, needs_time: true, active: false }, 'logged in without time: refused, and the popup is told why');
+  assert.equal(out.bad_key, 403, 'a key that was never made');
+  assert.equal(out.junk_key, 403);
+  assert.deepEqual(out.redeemed, { status: 200, active: true, plan: '7 days' }, 'a key gives time, on the website too');
+  assert.equal(out.key_twice, 403, 'a key works once');
   assert.equal(out.state_user.body.user.name, 'Popup');
   assert.deepEqual(out.state_user.body.quota, { used: 0, limit: 3, left: 3 });
   assert.deepEqual(out.makes, [200, 200, 200]);
@@ -335,4 +362,10 @@ test('the download popup: log in first, then a few installers a day, and the adm
   assert.deepEqual(out.bad, ['refused', 'refused', 'refused', 'refused']);
   assert.match(out.url, /^\/get\/[\w-]{32}$/);
   assert.equal(out.bad_action, 400);
+  assert.equal(out.expired, 403, 'when the time is up, no more installers');
+  assert.equal(out.second_key, true, 'another key brings the account back');
+  assert.equal(out.again, 200);
+  assert.equal(out.switched_off.status, 403);
+  assert.match(out.switched_off.message, /switched off/);
+  assert.equal(out.key_when_off, 403, 'a key is not used up for an account that is switched off');
 });

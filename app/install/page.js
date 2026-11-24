@@ -10,7 +10,7 @@ export const metadata = {
 };
 
 const STEPS = [
-  ['Log in with Discord', 'The download button opens a window that takes you to Discord and back. Grape only gets your public profile: your name, picture and id.'],
+  ['Log in and redeem a key', 'The download button opens a window that takes you to Discord and back, and asks for a key if your account has no time left. Only an account with time on it can download. Grape only gets your public profile: your name, picture and id.'],
   ['Get your installer', 'The server makes an installer just for you. It works once, on the first computer that starts it, so keep it to yourself. There is a limit of a few a day.'],
   ['Run it', 'Grape is put in its own folder, with a Desktop and a Start menu shortcut if you leave them on. The installer checks what it downloaded, adds Grape to Windows’ list of apps, and removes itself when it is done.'],
   ['Open Grape', 'Log in with Discord, redeem your key, and the window opens. The first start needs the internet: the server checks your account and unlocks the window.'],
