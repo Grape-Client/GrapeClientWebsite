@@ -24,11 +24,21 @@ writeFileSync(join(files, 'version.json'), JSON.stringify({ version: '9.9.9' }))
 const STUB_ENC = Buffer.concat([Buffer.from('STUBENC'), crypto.randomBytes(9000)]);
 const DLL_ENC = Buffer.concat([Buffer.from('DLLENC'), crypto.randomBytes(100000)]);
 writeFileSync(join(files, 'stub.enc'), STUB_ENC);
+// an agent of each generation: the plain jar an older loader was built for, and the encrypted one of the new loader
+const RESOURCE_KEY = crypto.randomBytes(32);
+writeFileSync(join(files, 'resource.key'), RESOURCE_KEY);
+writeFileSync(join(files, 'agent-legacy.jar'), Buffer.from('PK-legacy-agent'));
+{
+  const iv = crypto.randomBytes(12), cipher = crypto.createCipheriv('aes-256-gcm', RESOURCE_KEY, iv);
+  cipher.setAAD(Buffer.from('grape-agent-core-resource-v1'));
+  writeFileSync(join(files, 'agent-new.jar.enc'), Buffer.concat([iv, cipher.update(Buffer.from('PK-new-agent')), cipher.final(), cipher.getAuthTag()]));
+}
 writeFileSync(join(files, 'dll.enc'), DLL_ENC);
 const env = {
   ...process.env, GRAPE_DATA: data, GRAPE_PORT: String(port), GRAPE_NO_PAGES: '1', GRAPE_DEV: '0',
   GRAPE_SETUP_STUB: join(files, 'grape-setup.exe'), GRAPE_APP_EXE: join(files, 'Grape.exe'), GRAPE_APP_VERSION_FILE: join(files, 'version.json'),
   GRAPE_STUB_ENC: join(files, 'stub.enc'), GRAPE_DLL_ENC: join(files, 'dll.enc'),
+  GRAPE_PAYLOAD: join(files, 'agent-legacy.jar'), GRAPE_PAYLOAD_ENC: join(files, 'agent-new.jar.enc'), GRAPE_RESOURCE_KEY_FILE: join(files, 'resource.key'),
 };
 let server;
 
@@ -418,4 +428,24 @@ test('the stub jar and the DLL are served only to an active-license session, by 
   assert.equal(out.unknown, 400, 'only the names the server knows');
   assert.equal(out.proto, 400, 'a name that belongs to every object is not a resource');
   assert.equal(out.noLicense, 403, 'nothing without an active license');
+});
+
+test('a loader gets the agent of its own generation: the plain one when it is older than 0.1.1, the new one from 0.1.1', () => {
+  const run = spawnSync(process.execPath, ['-e', `
+    const core = require(${JSON.stringify(join(root, 'lib', 'core.js'))});
+    const linkKey = require('crypto').randomBytes(32);
+    const ask = (version) => {
+      const ctx = { conn: { hwid: 'a'.repeat(64), clientVersion: version }, id: 'c0ffeec0ffeec0ff', user: { plan: 'month', expires: Date.now() + 1e9, uses: 0 }, users: { u: {} }, account: { user: 'u' } };
+      const [status, body] = core.SECURE['/v1/redeem'](ctx, { link_key: linkKey.toString('base64') });
+      if (status !== 200) return { status };
+      return { status, agent: core.open(linkKey, Buffer.from(body.agent, 'base64'), Buffer.from('grape-agent-core')).toString() };
+    };
+    console.log(JSON.stringify({ none: ask(''), old: ask('0.1.0'), edge: ask('0.1.1'), newer: ask('0.2.0'), much: ask('1.0.0') }));`], { env, encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  const out = JSON.parse(run.stdout.trim().split('\n').pop());
+  assert.deepEqual(out.none, { status: 200, agent: 'PK-legacy-agent' }, 'a loader that did not say its version is an old one');
+  assert.deepEqual(out.old, { status: 200, agent: 'PK-legacy-agent' }, '0.1.0 gets the agent it was built with');
+  assert.deepEqual(out.edge, { status: 200, agent: 'PK-new-agent' }, '0.1.1 gets the new agent');
+  assert.deepEqual(out.newer, { status: 200, agent: 'PK-new-agent' });
+  assert.deepEqual(out.much, { status: 200, agent: 'PK-new-agent' });
 });
