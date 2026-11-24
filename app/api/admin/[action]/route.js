@@ -7,12 +7,7 @@ export async function POST(request, { params }) {
   const grape = globalThis.grape;
   if (!grape) return Response.json({ error: 'The server is not running its core (start it with node server.js).' }, { status: 503 });
   // only this site's own page may call it (the cookie is SameSite=Strict too)
-  const origin = request.headers.get('origin');
-  try {
-    if (origin && new URL(origin).host !== request.headers.get('host')) return Response.json({ error: 'Not from this site.' }, { status: 403 });
-  } catch {
-    return Response.json({ error: 'Not from this site.' }, { status: 403 });
-  }
+  if (!grape.sameSite((name) => request.headers.get(name), request.headers.get('host'))) return Response.json({ error: 'Not from this site.' }, { status: 403 });
   let body = {};
   try { body = await request.json(); } catch { /* no body */ }
   const out = await grape.adminApi(action, body, {

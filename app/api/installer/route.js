@@ -16,12 +16,8 @@ export async function GET(request) {
 
 export async function POST(request) {
   // only this site's own page may ask for an installer (the cookie is SameSite=Lax: a form on another site would carry it)
-  const origin = request.headers.get('origin');
-  try {
-    if (origin && new URL(origin).host !== request.headers.get('host')) return Response.json({ error: 'Not from this site.' }, { status: 403 });
-  } catch {
-    return Response.json({ error: 'Not from this site.' }, { status: 403 });
-  }
+  const grape0 = globalThis.grape;
+  if (grape0 && !grape0.sameSite((name) => request.headers.get(name), request.headers.get('host'))) return Response.json({ error: 'Not from this site.' }, { status: 403 });
   let body = {};
   try { body = await request.json(); } catch { /* no body: it is "make" */ }
   const grape = globalThis.grape;

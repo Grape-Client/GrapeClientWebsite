@@ -369,3 +369,19 @@ test('the download popup: log in, have time on the account, then a few installer
   assert.match(out.switched_off.message, /switched off/);
   assert.equal(out.key_when_off, 403, 'a key is not used up for an account that is switched off');
 });
+
+test('a form posted from one of this site\'s own pages is let in even when the browser sends Origin: null, and nothing from another site is', async () => {
+  const post = (headers) => new Promise((resolve, reject) => {
+    const req = http.request({ host: '127.0.0.1', port, path: '/login/discord/go', method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...headers } }, (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
+    req.on('error', reject);
+    req.end('state=nothing');
+  });
+  const here = `http://127.0.0.1:${port}`;
+  assert.equal(await post({ Origin: here }), 303, 'this site, by its Origin');
+  assert.equal(await post({ Origin: 'null', 'Sec-Fetch-Site': 'same-origin' }), 303, 'Origin: null from a page of this site (Referrer-Policy: no-referrer)');
+  assert.equal(await post({ Origin: 'null', 'Sec-Fetch-Site': 'cross-site' }), 403, 'Origin: null from another site');
+  assert.equal(await post({ Origin: 'null' }), 403, 'Origin: null and nothing to say where from');
+  assert.equal(await post({ Origin: 'https://evil.example', 'Sec-Fetch-Site': 'same-origin' }), 403, 'another site\'s Origin is never trusted');
+  assert.equal(await post({ 'Sec-Fetch-Site': 'cross-site' }), 403, 'no Origin, but a browser saying it is another site');
+  assert.equal(await post({}), 303, 'a tool with neither header is not a page');
+});
