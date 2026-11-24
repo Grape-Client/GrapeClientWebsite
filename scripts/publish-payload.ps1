@@ -12,7 +12,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $dir = Join-Path $PSScriptRoot '..\payload'
-$files = 'Grape.exe', 'grape-setup.exe', 'grape-agent-core.jar.enc', 'grape-ui.json', 'version.json'
+$files = 'Grape.exe', 'grape-setup.exe', 'grape-agent-core.jar.enc', 'grape-agent.jar.enc', 'grape-dll.enc', 'grape-ui.json', 'version.json'
 foreach ($f in $files) {
   if (-not (Test-Path (Join-Path $dir $f))) { throw "payload\$f is missing: run sync-payload.ps1 (and build the app) first." }
 }
