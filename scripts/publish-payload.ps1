@@ -27,6 +27,6 @@ if (Test-Path (Join-Path $dir 'names')) {
   scp -i $Key -P $Port -r (Join-Path $dir 'names\*') "${Target}:/opt/grape-server/payload/names/"
   if ($LASTEXITCODE -ne 0) { throw "scp failed for names" }
 }
-ssh -i $Key -p $Port $Target 'cd /opt/grape-server/payload && rm -f grape-agent-core.jar && for f in *.new; do mv -f "$f" "${f%.new}"; done && ls -l'
+ssh -i $Key -p $Port $Target 'cd /opt/grape-server/payload && for f in *.new; do mv -f "$f" "${f%.new}"; done && ls -l'
 if ($LASTEXITCODE -ne 0) { throw "could not put the files in place" }
 Write-Host 'Done: the server reads the new files on the next request (no restart needed).'
