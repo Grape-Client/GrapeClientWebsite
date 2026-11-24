@@ -449,3 +449,41 @@ test('a loader gets the agent of its own generation: the plain one when it is ol
   assert.deepEqual(out.newer, { status: 200, agent: 'PK-new-agent' });
   assert.deepEqual(out.much, { status: 200, agent: 'PK-new-agent' });
 });
+
+test('an update is offered only to a loader that is behind, with a license, and its ticket works once and only for the file it was made for', async () => {
+  const run = spawnSync(process.execPath, ['-e', `
+    const core = require(${JSON.stringify(join(root, 'lib', 'core.js'))});
+    const ctx = (version, plan = 'month') => ({ conn: { hwid: 'a'.repeat(64), clientVersion: version }, id: 'c0ffeec0ffeec0ff', user: { plan, expires: plan ? Date.now() + 1e9 : 0, uses: 0 }, users: { u: {} }, account: { user: 'u' } });
+    const offer = (version, plan) => core.SECURE['/v1/update'](ctx(version, plan));
+    const out = {};
+    out.latest = (({ version, app_size, app_sha256 }) => ({ version, size: app_size, sha256: app_sha256 }))(core.latestApp());
+    out.behind = offer('0.1.1');
+    out.unknown = offer('')[1].update;                     // a loader that did not say its version is the oldest
+    out.same = offer('9.9.9');
+    out.newer = offer('10.0.0');
+    out.no_license = offer('0.1.1', null)[0];
+    const ticket = offer('0.1.1')[1].ticket;
+    out.ticket_shape = /^[A-Za-z0-9_-]{20,64}$/.test(ticket);
+    out.take_first = (core.takeUpdateTicket(ticket) || {}).sha256 === out.latest.sha256;
+    out.take_again = core.takeUpdateTicket(ticket);
+    out.take_junk = [core.takeUpdateTicket('x'), core.takeUpdateTicket(''), core.takeUpdateTicket('../../etc/passwd')];
+    console.log(JSON.stringify(out));`], { env, encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  const out = JSON.parse(run.stdout.trim().split('\n').pop());
+  assert.equal(out.latest.version, '9.9.9');
+  assert.equal(out.latest.sha256, crypto.createHash('sha256').update(APP).digest('hex'));
+  assert.equal(out.behind[0], 200);
+  assert.equal(out.behind[1].update, true, 'a loader that is behind is offered the newer Grape');
+  assert.deepEqual([out.behind[1].version, out.behind[1].size, out.behind[1].sha256], ['9.9.9', APP.length, out.latest.sha256], 'with the size and hash it must have');
+  assert.equal(out.unknown, true);
+  assert.deepEqual(out.same, [200, { update: false }], 'a loader of the same version is not');
+  assert.deepEqual(out.newer, [200, { update: false }], 'nor a newer one');
+  assert.equal(out.no_license, 403, 'no update without an active license');
+  assert.ok(out.ticket_shape);
+  assert.equal(out.take_first, true, 'the ticket is good for the file it was made for');
+  assert.equal(out.take_again, null, 'but only once');
+  assert.deepEqual(out.take_junk, [null, null, null]);
+  // the download route turns away what it does not know
+  const got = await fetchBytes('GET', '/v1/update/file/' + 'z'.repeat(32));
+  assert.equal(got.status, 403);
+});
