@@ -1,0 +1,16 @@
+# Caddy in front of Grape's server: https with a certificate it gets and renews by itself, nothing else open.
+# Replace grape.example.com with your domain (its DNS must point at this machine).
+grape.example.com {
+	encode zstd gzip
+	# the one address the admin page and its API are reachable from, as well as the allow-list in Settings > Security
+	# @admin path /admin-grape* /api/admin*
+	# handle @admin { @blocked not remote_ip 203.0.113.5 ; respond @blocked 404 }
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+	# the WebSocket (/v1/ws) goes through as it is; Caddy puts the real client address in X-Forwarded-For (GRAPE_TRUST_PROXY=1)
+	reverse_proxy 127.0.0.1:8787
+}

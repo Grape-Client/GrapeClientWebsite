@@ -1,0 +1,21 @@
+{
+  "name": "grape-server",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Grape's server: accounts, keys, Discord login, the loader's WebSocket, the website and the admin page.",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "next build",
+    "start": "node server.js --prod",
+    "sync-style": "node scripts/sync-app-style.mjs",
+    "test": "node --test test/hardening.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "next": "^16.4.6",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  }
+}

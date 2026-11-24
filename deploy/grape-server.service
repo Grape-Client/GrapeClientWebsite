@@ -1,0 +1,36 @@
+# /etc/systemd/system/grape-server.service      sudo systemctl enable --now grape-server
+[Unit]
+Description=Grape server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=grape
+Group=grape
+WorkingDirectory=/opt/grape-server
+Environment=NODE_ENV=production
+Environment=GRAPE_BIND=127.0.0.1
+Environment=GRAPE_PORT=8787
+Environment=GRAPE_DATA=/var/lib/grape-server
+Environment=GRAPE_PUBLIC_URL=https://grape.example.com
+Environment=GRAPE_TRUST_PROXY=1
+# secrets can come from here instead of the admin page (a file only the grape user reads): GRAPE_DISCORD_CLIENT_SECRET=...
+EnvironmentFile=-/etc/grape-server.env
+ExecStart=/usr/bin/node server.js --prod
+Restart=on-failure
+RestartSec=3
+# what the server does not need, it cannot do
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadWritePaths=/var/lib/grape-server
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ProtectKernelTunables=true
+ProtectControlGroups=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

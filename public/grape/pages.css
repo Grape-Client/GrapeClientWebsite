@@ -1,0 +1,423 @@
+/* The title bar's list of pages and arrows, the side bar every page has, Home, Settings, and the editor's screen
+   while no script is open. Loaded after style.css: where both say something, this file wins. */
+
+/* ---------------------------------------------------------------- the title bar: the name with its list of pages, the arrows */
+
+.titlebar { display: grid; grid-template-columns: 1fr auto 1fr; padding: 0 8px 2px 10px; }
+.titlebar-left { justify-self: start; }
+.titlebar-left { display: flex; align-items: center; gap: 4px; }
+.brand { height: 36px; display: flex; align-items: center; gap: 9px; padding: 0 9px 0 7px; border-radius: 10px; outline: 0; }
+.brand img { width: 24px; height: 24px; pointer-events: none; }
+.brand span { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; color: var(--title); }
+.brand .ic { width: 13px; height: 13px; color: var(--icon); transition: transform 0.16s ease; }
+.nav-arrow, .bar-toggle { width: 32px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: #b4b4b4; outline: 0; }
+.nav-arrow .ic, .bar-toggle .ic { width: 16px; height: 16px; }
+.nav-arrow:hover, .bar-toggle:hover { background: var(--hover); color: #fff; }
+.nav-arrow:disabled { color: #4c4c4c; cursor: default; background: none; }
+#nav-back { margin-left: 8px; }
+.bar-toggle { color: #7d7d7d; }
+.bar-toggle.on { color: #d6d6d6; }
+.titlebar-right { gap: 4px; }
+.titlebar-right .method { margin: 0 6px; }
+html:not([data-page="scripts"]) .bar-toggle { display: none; }
+
+.nav-tabs { display: flex; align-items: center; gap: 2px; }
+.nav-tabs button { height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 9px; font-size: 13px; font-weight: 600; color: #9a9a9a; outline: 0; }
+.nav-tabs button .ic { width: 15px; height: 15px; }
+.nav-tabs button:hover { background: #151515; color: #e2e2e2; }
+.nav-tabs button.on { background: var(--hover); color: var(--white); }
+
+/* ---------------------------------------------------------------- a page: its side bar and what is open beside it */
+
+.mc-page { grid-template-columns: 212px minmax(0, 1fr); }
+.mc-side { padding: 12px 10px; display: flex; flex-direction: column; overflow-y: auto; }
+.mc-side-head { flex: none; height: 46px; padding: 0 4px 0 10px; font-size: 22px; margin-bottom: 4px; }
+.mc-side-item { flex: none; height: 38px; margin-top: 2px; gap: 13px; outline: 0; }
+.mc-side-item:hover { background: #121212; }
+.mc-side-item.active { background: var(--raised); }
+.mc-main { padding: 22px 28px 28px 30px; }
+.mc-main h2 { margin: 2px 0 16px 0; font-size: 20px; }
+.pg-rule { flex: none; width: calc(100% - 16px); margin: 12px 8px 10px 8px; border: 0; border-top: 1px solid var(--line); }
+.mc-side-item.pg-link { height: 44px; }
+.pg-link > span { display: flex; flex-direction: column; line-height: 1.25; }
+.pg-link b { font-size: 13px; font-weight: 700; color: var(--white); }
+.pg-link em { font-style: normal; font-size: 10.5px; font-weight: 500; color: #8c8c8c; }
+.pg-search { flex: none; margin: 2px 0 10px 0; }
+.mc-page.narrow .pg-search, .mc-page.narrow .pg-rule { display: none; }
+.pg-more { display: inline-flex; align-items: center; gap: 5px; margin-right: 6px; font-size: 11.5px; font-weight: 500; color: #9a9a9a; }
+.pg-more .ic { width: 11px; height: 11px; }
+.pg-more:hover { color: #fff; }
+
+/* ---------------------------------------------------------------- Home */
+
+.home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.home-card { min-height: 62px; display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 10px 16px; border-radius: 12px; background: var(--raised); }
+.home-card.wide { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; min-height: 76px; }
+.home-card.wide > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.home-card.right { align-items: flex-end; }
+.home-card span { font-size: 12px; font-weight: 500; color: #a0a0a0; }
+.home-card b { font-size: 14.5px; font-weight: 700; color: var(--white); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-card b.good { color: #46d389; }
+.home-card.wide b { font-size: 16px; }
+.home-card em { font-style: normal; font-size: 11.5px; color: #8c8c8c; }
+.home-card em:empty { display: none; }
+.home-card .mc-get { height: 34px; font-size: 12.5px; }
+.mc-card.home-update { padding: 14px 16px; }
+.home-update-head { display: flex; align-items: center; gap: 9px; }
+.home-update-head b { font-size: 14.5px; font-weight: 700; color: var(--white); }
+.home-update-head em { font-style: normal; font-size: 9.5px; font-weight: 700; letter-spacing: 0.5px; padding: 2px 6px; border-radius: 5px; background: #262626; color: #cfcfcf; }
+.home-update ul { margin: 9px 0 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.home-update li { position: relative; padding-left: 14px; font-size: 12.5px; color: #c4c4c4; }
+.home-update li::before { content: ""; position: absolute; left: 2px; top: 8px; width: 3px; height: 3px; border-radius: 50%; background: #6a6a6a; }
+.home-script { width: 100%; display: flex; align-items: center; gap: 13px; padding: 11px 16px; margin-bottom: 6px; border-radius: 12px; background: var(--raised); text-align: left; outline: 0; }
+.home-script:hover { background: #191919; }
+.home-script > .ic { width: 15px; height: 15px; color: #b0b0b0; }
+.home-script-words { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.home-script b { font-size: 13.5px; font-weight: 600; color: var(--white); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-script em { font-style: normal; font-size: 11px; color: #8c8c8c; }
+.home-script time { font-size: 11.5px; color: #8c8c8c; }
+
+/* ---------------------------------------------------------------- Settings */
+
+.mc-card.set-card { padding: 4px 16px; }
+.set-row { display: flex; align-items: center; gap: 15px; min-height: 58px; padding: 9px 0; }
+.set-row + .set-row { border-top: 1px solid #1b1b1b; }
+.set-row > .ic { width: 16px; height: 16px; color: #c4c4c4; }
+.set-row.indent { padding-left: 31px; min-height: 46px; }
+.set-row.indent > .ic { display: none; }
+.set-row.indent .set-words span { display: none; }
+.set-row.off { opacity: 0.4; }
+.set-words { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.set-words b { font-size: 14px; font-weight: 600; color: var(--white); }
+.set-words span { font-size: 12px; color: #9a9a9a; }
+.set-choice { display: flex; gap: 2px; padding: 3px; border-radius: 10px; background: #1c1c1c; }
+.set-choice button { height: 26px; min-width: 34px; padding: 0 11px; border-radius: 7px; font-size: 12px; font-weight: 600; color: #a6a6a6; outline: 0; }
+.set-choice button:hover { color: #fff; }
+.set-choice button.on { background: #333333; color: #fff; }
+.set-number { display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 10px; background: #1c1c1c; }
+.set-number b { min-width: 30px; text-align: center; font-size: 13px; font-weight: 700; color: var(--white); }
+.set-number button { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 7px; color: #b4b4b4; outline: 0; }
+.set-number button .ic { width: 12px; height: 12px; }
+.set-number button:hover { background: #2c2c2c; color: #fff; }
+.set-number button:disabled { opacity: 0.35; cursor: default; background: none; }
+.set-keys { display: flex; gap: 5px; }
+.set-keys kbd, .welcome kbd { font: inherit; font-size: 11px; font-weight: 700; color: #a2a2a2; background: #1f1f1f; border-radius: 6px; padding: 3px 8px; }
+
+/* ---------------------------------------------------------------- the editor with no script open */
+
+.empty-state { gap: 0; padding-bottom: 30px; align-items: safe center; justify-content: safe center; overflow: auto; }   /* a short editor: it scrolls instead of spilling over the toolbar */
+.welcome { display: flex; align-items: stretch; }
+.welcome-left { width: 232px; padding-right: 28px; }
+.welcome-right { width: 330px; padding: 34px 0 0 28px; border-left: 1px solid var(--line); }
+.welcome h2 { margin: 0 0 26px 8px; font-size: 21px; font-weight: 700; letter-spacing: -0.3px; color: var(--title); }
+.welcome h6 { margin: 0 0 8px 8px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.7px; color: #a2a2a2; }
+.welcome-left h6 ~ h6 { margin-top: 18px; }
+.welcome-row { width: 100%; height: 32px; display: flex; align-items: center; gap: 12px; padding: 0 8px; border-radius: 8px; color: #c9c9c9; font-size: 13px; font-weight: 500; text-align: left; outline: 0; }
+.welcome-row .ic { width: 14px; height: 14px; color: #a6a6a6; }
+.welcome-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.welcome .welcome-row kbd { margin-left: -7px; padding: 2px 6px; font-size: 10px; color: #7c7c7c; background: #1a1a1a; }
+.welcome-row:hover { background: var(--hover); color: #fff; }
+.welcome-none { margin: 4px 8px; font-size: 12.5px; color: var(--muted); }
+.welcome-card { width: 100%; height: 44px; display: flex; align-items: center; gap: 14px; padding: 0 15px; margin-bottom: 8px; border-radius: 11px; background: var(--raised); color: #e4e4e4; font-size: 13px; font-weight: 600; text-align: left; outline: 0; }
+.welcome-card .ic { width: 15px; height: 15px; color: #b9b9b9; }
+.welcome-card:hover { background: var(--hover); color: #fff; }
+
+/* ---------------------------------------------------------------- the DOWNLOAD card, to the reference's measurements */
+
+.mc-download { gap: 14px; min-height: 93px; padding: 16px; border-radius: 14px; border: 0; overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 4px 24px rgba(0, 0, 0, 0.25);
+  background:
+    radial-gradient(60% 150% at 58% 50%, rgba(22, 44, 84, 0.34), transparent 70%),
+    radial-gradient(42% 150% at 100% 60%, rgba(74, 42, 16, 0.30), transparent 72%),
+    radial-gradient(40% 140% at 78% 40%, rgba(14, 52, 50, 0.20), transparent 70%),
+    #131414; }
+.mc-product { width: 60px; height: 60px; padding: 8px; border-radius: 14px; border: 0; background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.12); }
+.mc-product:hover { background: rgba(255, 255, 255, 0.08); }
+.mc-product > .ic { right: 3px; bottom: 3px; width: 12px; height: 12px; color: rgba(255, 255, 255, 0.88); }
+.mc-logo.big { width: 40px; height: 40px; }
+.mc-download-main { gap: 2px; }
+.mc-download-main b { font-size: 16px; font-weight: 700; line-height: 1.2; letter-spacing: -0.16px; color: rgba(255, 255, 255, 0.96); }
+.mc-download-main > span { font-size: 11px; line-height: 1.3; color: rgba(255, 255, 255, 0.38); }
+.mc-download-line { gap: 5px; margin-top: 5px; }
+.mc-version { height: 19px; gap: 3px; padding: 2px 5px; border-radius: 6px; background: rgba(255, 255, 255, 0.09); color: rgba(255, 255, 255, 0.55); font-size: 10px; font-weight: 400; letter-spacing: 0; }
+.mc-version .ic { width: 9px; height: 9px; color: rgba(255, 255, 255, 0.38); }
+.mc-version:hover { background: rgba(255, 255, 255, 0.14); }
+.mc-version.single:hover { background: rgba(255, 255, 255, 0.09); }
+.mc-dot { width: 2px; height: 2px; background: rgba(255, 255, 255, 0.25); }
+.mc-download .mc-state { font-size: 10px; font-weight: 600; }
+.mc-download .mc-state.good { color: #4ade80; }
+.mc-get { height: 32px; padding: 0 14px; border-radius: 10px; border: 0; background: rgba(255, 255, 255, 0.15); color: #fff; font-size: 12px; font-weight: 650; letter-spacing: 0;
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.32), 0 2px 12px rgba(0, 0, 0, 0.28); }
+.mc-get:hover { background: rgba(255, 255, 255, 0.22); }
+.mc-get:disabled:hover { background: rgba(255, 255, 255, 0.15); }
+.home-card .mc-get { height: 32px; font-size: 12px; }
+
+/* ---------------------------------------------------------------- the short name under a button the mouse rests on (tips.js) */
+
+.tip { position: fixed; z-index: 200; padding: 5px 10px; border-radius: 9px; background: #262626; color: #f1f1f1; font-size: 12px; font-weight: 600; white-space: nowrap; pointer-events: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); opacity: 0; transform: translateY(-2px); transition: opacity 0.12s ease, transform 0.12s ease; }
+.tip.shown { opacity: 1; transform: none; }
+.tip[hidden] { display: none; }
+
+/* The card's glow, made the way the reference makes its own: a picture stretched over the card, blurred, darkened and
+   saturated. The picture is the chosen product's icon. */
+.mc-download { position: relative; background: #131414; }
+.mc-download > * { position: relative; z-index: 1; }
+.mc-download > .mc-download-bg { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.mc-download-bg img { width: 100%; height: 100%; object-fit: cover; object-position: center 30%; filter: blur(30px) brightness(0.17) saturate(2.2); transform: scale(1.14); display: block; }
+.mc-download-tint { position: absolute; inset: 0; filter: blur(30px) brightness(0.17) saturate(2.2); transform: scale(1.14);
+  background: linear-gradient(100deg, #8a8a8a 0%, #d8d8d8 45%, #6f6f6f 100%); }
+.mc-download-tint.modrinth { background: linear-gradient(100deg, #0c6b35 0%, #1bd96a 50%, #0a4d28 100%); }
+.mc-download-tint.fabric { background: linear-gradient(100deg, #6b5a3c 0%, #dbd0b4 50%, #807a6d 100%); }
+.mc-download-tint.lunar { background: linear-gradient(100deg, #5a6a86 0%, #2f5fb8 50%, #8a5a34 100%); }
+
+.set-input { width: 260px; height: 34px; padding: 0 12px; border: 0; outline: 0; border-radius: 9px; background: #1c1c1c; color: var(--white); font: inherit; font-size: 12.5px; user-select: text; }
+.set-input::placeholder { color: #6f6f6f; }
+.set-input:focus { background: #232323; }
+.set-row .mc-get { height: 34px; }
+
+.home-card.wide .home-right { align-items: flex-end; text-align: right; min-width: 120px; }
+.home-card.wide > .home-right { display: flex; flex-direction: column; gap: 3px; }
+.set-value { font-size: 14px; font-weight: 700; color: var(--white); white-space: nowrap; }
+.set-value.good { color: #46d389; }
+.set-value.bad { color: #ef6b70; }
+.set-error { margin: 0; padding: 8px 0 12px 31px; font-size: 12px; color: #ef6b70; user-select: text; }
+.home-card b.bad { color: #ef6b70; }
+
+/* ---------------------------------------------------------------- Connections: Grape MCP */
+
+.mcp-card { padding: 0; overflow: hidden; }
+.mcp-top { display: flex; align-items: center; gap: 14px; padding: 16px 18px; }
+.mcp-logo { width: 22px; height: 22px; display: grid; place-items: center; color: #d6d6d6; flex: none; }
+.mcp-logo .ic { width: 20px; height: 20px; }
+.mcp-words { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.mcp-title { display: flex; align-items: baseline; gap: 9px; }
+.mcp-title b { font-size: 14px; font-weight: 700; color: var(--white); }
+.mcp-title em { font-style: normal; font-size: 11px; font-weight: 700; color: #8f8f8f; }
+.mcp-title em.good { color: #46d389; }
+.mcp-words > span { font-size: 12px; color: #9a9a9a; }
+.mcp-buttons { display: flex; align-items: center; gap: 6px; flex: none; }
+.mcp-icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: #a6a6a6; outline: 0; }
+.mcp-icon .ic { width: 14px; height: 14px; }
+.mcp-icon:hover { background: #1f1f1f; color: #fff; }
+.mcp-pill { height: 30px; display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 8px; font-size: 12px; font-weight: 600; color: #cfcfcf; outline: 0; white-space: nowrap; }
+.mcp-pill .ic { width: 13px; height: 13px; color: #a6a6a6; }
+.mcp-pill:hover { background: #1f1f1f; color: #fff; }
+.mcp-pill.primary { background: #e7e7ea; color: #111113; }
+.mcp-pill.primary:hover { background: #fff; }
+.mcp-power { height: 30px; display: inline-flex; align-items: center; gap: 7px; padding: 0 13px; border-radius: 8px; background: #e7e7ea; color: #111113; font-size: 12px; font-weight: 700; outline: 0; }
+.mcp-power .ic { width: 12px; height: 12px; }
+.mcp-power:hover { background: #fff; }
+.mcp-power.on { background: #2c2c2c; color: #f1f1f1; }
+.mcp-power.on:hover { background: #383838; }
+.mcp-fold { width: 100%; display: flex; align-items: center; gap: 9px; padding: 13px 18px; border-top: 1px solid #1b1b1b; text-align: left; font-size: 12.5px; font-weight: 600; color: #cfcfcf; outline: 0; }
+.mcp-fold .ic { width: 12px; height: 12px; color: #8f8f8f; transition: transform 0.14s ease; }
+.mcp-fold.open .ic { transform: rotate(90deg); }
+.mcp-fold em { font-style: normal; font-size: 11px; font-weight: 700; color: #8f8f8f; margin-left: 2px; }
+.mcp-fold:hover { background: #171717; }
+.mcp-perm { padding: 9px 18px; border-top: 1px solid #1b1b1b; }
+.mcp-card .set-row + .set-row { border-top: 1px solid #1b1b1b; }
+
+.mcp-modal { width: min(560px, calc(100vw - 40px)); max-height: calc(100vh - 80px); display: flex; flex-direction: column; }
+.mcp-docs { overflow-y: auto; padding: 4px 4px 6px 2px; user-select: text; }
+.mcp-docs p { margin: 0 0 10px 0; font-size: 12.5px; line-height: 1.5; color: #bdbdbd; }
+.mcp-docs h6 { margin: 16px 0 8px 0; font-size: 10.5px; font-weight: 600; letter-spacing: 0.7px; color: #a2a2a2; }
+.mcp-code { margin: 0 0 10px 0; padding: 12px; border-radius: 10px; background: #151515; font: 11.5px/1.5 Consolas, monospace; color: #d6d6d6; white-space: pre-wrap; word-break: break-all; }
+.mcp-docs-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+.mcp-docs-buttons .mcp-pill { background: #1f1f1f; }
+.mcp-tool { display: grid; grid-template-columns: 130px 1fr auto; gap: 12px; align-items: baseline; padding: 7px 0; border-top: 1px solid #1b1b1b; font-size: 12px; }
+.mcp-tool b { font-family: Consolas, monospace; font-weight: 700; color: #e6e6e6; }
+.mcp-tool span { color: #a0a0a0; }
+.mcp-tool em { font-style: normal; font-size: 10.5px; font-weight: 700; color: #8f8f8f; background: #1c1c1c; padding: 2px 7px; border-radius: 5px; }
+.mcp-ais { display: flex; flex-direction: column; padding: 6px 0 2px 0; }
+.mcp-ai { display: flex; align-items: center; gap: 13px; padding: 10px 6px; border-top: 1px solid #1b1b1b; }
+.mcp-ai:first-child { border-top: 0; }
+.mcp-ai-words { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.mcp-ai b { font-size: 13.5px; font-weight: 600; color: #e6e6e6; }
+.mcp-ai-state { font-size: 11.5px; font-weight: 600; color: #8f8f8f; }
+.mcp-ai-state.connected { color: #46d389; }
+.mcp-ai-actions { display: flex; gap: 4px; }
+
+.mcp-veil { z-index: 70; }
+#confirm { z-index: 80; }
+
+.mcp-ai-logo { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; background: #1d1d1d; overflow: hidden; }
+.mcp-ai-logo img { width: 100%; height: 100%; object-fit: contain; }
+.mcp-ai-logo .ic { width: 17px; height: 17px; color: #bdbdbd; }
+.mcp-ai-state.added { color: #e3b04b; }
+.mcp-pill:disabled { opacity: 0.5; cursor: default; }
+.mcp-pill .ic { flex: none; }
+
+/* Redeem key */
+.redeem-box { display: flex; flex-direction: column; gap: 12px; padding: 14px 0 12px; }
+.redeem-field { display: flex; gap: 8px; align-items: center; padding: 5px; border-radius: 12px; background: #1c1c1c; border: 1px solid transparent; transition: background 0.15s, border-color 0.15s; }
+.redeem-field:focus-within { background: #232323; border-color: #3a3a3a; }
+.redeem-field.bad { border-color: #ef6b70; animation: redeem-shake 0.32s; }
+.redeem-input { flex: 1; min-width: 0; height: 38px; padding: 0 10px; border: 0; outline: 0; background: transparent; color: var(--white); font: 600 14px/1 Consolas, 'Cascadia Mono', monospace; letter-spacing: 1.2px; user-select: text; }
+.redeem-input::placeholder { color: #5c5c5c; letter-spacing: 1.2px; font-weight: 500; }
+.redeem-btn { flex: none; height: 38px; padding: 0 20px; border: 0; border-radius: 9px; background: #fff; color: #111; font-size: 13px; font-weight: 700; cursor: pointer; transition: background 0.15s, opacity 0.15s; }
+.redeem-btn:hover:not(:disabled) { background: #e4e4e4; }
+.redeem-btn:disabled { opacity: 0.25; cursor: default; }
+.redeem-note { margin: 0; min-height: 16px; font-size: 12px; color: #9a9a9a; user-select: text; }
+.redeem-note.good { color: #46d389; }
+.redeem-note.bad { color: #ef6b70; }
+#settings-body .mc-card.flash { animation: redeem-flash 1.1s ease-out; }
+@keyframes redeem-flash { 0% { box-shadow: 0 0 0 2px rgba(70, 211, 137, 0.65); } 100% { box-shadow: 0 0 0 2px rgba(70, 211, 137, 0); } }
+@keyframes redeem-shake { 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
+
+/* ---- Motion -----------------------------------------------------------------------------------------------------
+   One easing for everything that moves in: quick start, soft landing. Anything that has to stay still for people who
+   asked for less motion is switched off by the prefers-reduced-motion rule in style.css. */
+:root { --ease-out: cubic-bezier(0.22, 1, 0.36, 1); --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+@keyframes page-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(12px) scale(0.985); } to { opacity: 1; transform: none; } }
+@keyframes side-in { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+@keyframes icon-pop { 0% { transform: scale(1); } 45% { transform: scale(1.22); } 100% { transform: scale(1); } }
+
+/* A page opens: it fades up, its side list slides in, and its cards come one after another. */
+.mc-page:not([hidden]) { animation: page-in 0.26s var(--ease-out); }
+.mc-page:not([hidden]) .mc-side-item { animation: side-in 0.3s var(--ease-out) both; }
+.mc-page:not([hidden]) .mc-side-item:nth-child(2) { animation-delay: 0.03s; }
+.mc-page:not([hidden]) .mc-side-item:nth-child(3) { animation-delay: 0.06s; }
+.mc-page:not([hidden]) .mc-side-item:nth-child(4) { animation-delay: 0.09s; }
+.mc-page:not([hidden]) .mc-side-item:nth-child(5) { animation-delay: 0.12s; }
+.mc-page:not([hidden]) .mc-side-item:nth-child(6) { animation-delay: 0.15s; }
+.mc-page:not([hidden]) .mc-side-item:nth-child(n+7) { animation-delay: 0.18s; }
+
+#settings-body > *, .home-card, .welcome-card, .mr-card, .mods-add-way { animation: rise-in 0.38s var(--ease-out) both; }
+#settings-body > :nth-child(2), .home-card:nth-child(2), .mr-card:nth-child(2) { animation-delay: 0.04s; }
+#settings-body > :nth-child(3), .home-card:nth-child(3), .mr-card:nth-child(3) { animation-delay: 0.08s; }
+#settings-body > :nth-child(4), .home-card:nth-child(4), .mr-card:nth-child(4) { animation-delay: 0.12s; }
+#settings-body.still > * { animation: none; }          /* redrawn while a search is typed: no entrance each key */
+#settings-body > :nth-child(5), .home-card:nth-child(5), .mr-card:nth-child(5) { animation-delay: 0.16s; }
+#settings-body > :nth-child(6), .home-card:nth-child(6), .mr-card:nth-child(6) { animation-delay: 0.2s; }
+#settings-body > :nth-child(n+7), .home-card:nth-child(n+7), .mr-card:nth-child(n+7) { animation-delay: 0.24s; }
+#settings-title { animation: page-in 0.3s var(--ease-out) both; }
+
+/* Things answer the pointer: cards lift a hair, buttons press in, side items lean in, icons nudge. */
+.mc-card, .home-card, .mr-card, .mods-add-way { transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.22s var(--ease-out), box-shadow 0.22s ease; }
+.home-card:hover, .mr-card:hover, .mods-add-way:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35); }
+.mc-card.set-card:hover { background: #171717; }
+
+button { transition: background-color 0.14s ease, color 0.14s ease, border-color 0.14s ease, opacity 0.18s ease, transform 0.14s var(--ease-out), box-shadow 0.18s ease; }
+button:active:not(:disabled) { transform: scale(0.96); }
+.redeem-btn:active:not(:disabled), .mc-get:active:not(:disabled) { transform: scale(0.95); }
+.mc-get:hover:not(:disabled), .redeem-btn:hover:not(:disabled) { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
+
+.nav-tabs button .ic, .mc-side-item .ic { transition: transform 0.22s var(--ease-spring); }
+.nav-tabs button:hover .ic, .mc-side-item:hover .ic { transform: scale(1.14) translateY(-1px); }
+.nav-tabs button.on .ic { animation: icon-pop 0.34s var(--ease-out); }
+.mc-side-item { transition: background-color 0.16s ease, color 0.16s ease, transform 0.2s var(--ease-out); }
+.mc-side-item:hover:not(.active) { transform: translateX(3px); }
+.nav-arrow:not(:disabled):hover { transform: translateX(0); }
+#nav-back:not(:disabled):hover .ic { transform: translateX(-2px); }
+#nav-forward:not(:disabled):hover .ic { transform: translateX(2px); }
+.nav-arrow .ic { transition: transform 0.18s var(--ease-out); }
+.brand img { transition: transform 0.4s var(--ease-spring); }
+.brand:hover img { transform: rotate(-12deg) scale(1.08); }
+
+/* Switches and fields have a little spring. */
+.green-switch, .green-switch i, .mod-switch i, .mod-switch i::after { transition-timing-function: var(--ease-spring); transition-duration: 0.28s; }
+.set-input, .redeem-field, .search { transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.2s ease; }
+.set-input:focus, .redeem-field:focus-within { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06); }
+
+/* Messages and values that change slide in instead of snapping. */
+.redeem-note:not(:empty) { animation: page-in 0.22s var(--ease-out); }
+.set-error { animation: page-in 0.22s var(--ease-out); }
+@keyframes value-in { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: none; } }
+.set-value { animation: value-in 0.3s var(--ease-out) both; }
+
+/* ---- Editor motion ------------------------------------------------------------------------------------------------
+   The editor's motion follows one set of numbers, so tabs, the toolbar, the explorer and the status bar all move the
+   same way: a short slide and fade in, a long soft landing, a small step between neighbours. */
+:root {
+  --ui-ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
+  --ui-fast: 0.18s;
+  --ui-base: 0.3s;
+  --ui-enter: 0.44s;
+  --ui-stagger: 35ms;
+  --ui-enter-y: 6px;
+  --ui-tab-offset: 12px;
+  --ease-out: var(--ui-ease-standard);
+}
+@keyframes tab-slide-in { from { opacity: 0; transform: translateX(var(--ui-tab-offset)); } to { opacity: 1; transform: none; } }
+@keyframes ui-rise { from { opacity: 0; transform: translateY(var(--ui-enter-y)); } to { opacity: 1; transform: none; } }
+@keyframes status-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+
+/* Tabs: a new one slides in from the side (its corner curves stay, so nothing is clipped), the close button fades
+   in on hover instead of switching on, and the name's color eases between states. */
+.tab.fresh { animation: tab-slide-in var(--ui-base) var(--ui-ease-standard) both; overflow: visible; }
+.tab { transition: background-color var(--ui-fast) var(--ui-ease-standard), color var(--ui-fast) var(--ui-ease-standard), flex-basis var(--ui-base) var(--ui-ease-standard); }
+.tab .tab-name { transition: color var(--ui-fast) var(--ui-ease-standard); }
+.tab-icon { transition: color var(--ui-fast) var(--ui-ease-standard), transform var(--ui-base) var(--ui-ease-standard); }
+.tab:hover .tab-icon { transform: scale(1.12); }
+.tab-close { visibility: visible; opacity: 0; transform: scale(0.8); transition: opacity var(--ui-fast) var(--ui-ease-standard), transform var(--ui-fast) var(--ui-ease-standard), background-color var(--ui-fast) var(--ui-ease-standard), color var(--ui-fast) var(--ui-ease-standard); pointer-events: none; }
+.tab:hover .tab-close, .tab.active .tab-close, .tab.dirty .tab-close { opacity: 0.7; transform: none; pointer-events: auto; }
+.tab-close:hover { opacity: 1 !important; }
+.tab-new { transition: color var(--ui-fast) var(--ui-ease-standard), transform var(--ui-base) var(--ui-ease-standard); }
+.tab-new:hover { transform: rotate(90deg); }
+.tabs-menu .ic { transition: transform var(--ui-base) var(--ui-ease-standard); }
+.tabs-menu:hover .ic { transform: translateY(2px); }
+
+/* Opening a script or switching tabs: the editor settles in. */
+#editor.swap { animation: ui-rise var(--ui-base) var(--ui-ease-standard) both; }
+
+/* The toolbar's buttons come in one after another, and answer the pointer. */
+.toolbar button { animation: ui-rise var(--ui-enter) var(--ui-ease-standard) both; transition: background-color var(--ui-fast) var(--ui-ease-standard), color var(--ui-fast) var(--ui-ease-standard), transform var(--ui-fast) var(--ui-ease-standard); }
+.toolbar button:nth-child(2) { animation-delay: calc(var(--ui-stagger) * 1); }
+.toolbar button:nth-child(3) { animation-delay: calc(var(--ui-stagger) * 2); }
+.toolbar button:nth-child(4) { animation-delay: calc(var(--ui-stagger) * 3); }
+.toolbar button:nth-child(5) { animation-delay: calc(var(--ui-stagger) * 4); }
+.toolbar button:nth-child(n+6) { animation-delay: calc(var(--ui-stagger) * 5); }
+.toolbar button:hover .ic { transform: translateY(-1px) scale(1.12); }
+.toolbar button .ic { transition: transform var(--ui-base) var(--ui-ease-standard), color var(--ui-fast) var(--ui-ease-standard); }
+
+/* Explorer: rows unfold with the same small step between neighbours. */
+.tree .files.animate > li { animation: ui-rise var(--ui-base) var(--ui-ease-standard) both; }
+.tree .files.animate > li:nth-child(2) { animation-delay: calc(var(--ui-stagger) * 1); }
+.tree .files.animate > li:nth-child(3) { animation-delay: calc(var(--ui-stagger) * 2); }
+.tree .files.animate > li:nth-child(4) { animation-delay: calc(var(--ui-stagger) * 3); }
+.tree .files.animate > li:nth-child(5) { animation-delay: calc(var(--ui-stagger) * 4); }
+.tree .files.animate > li:nth-child(6) { animation-delay: calc(var(--ui-stagger) * 5); }
+.tree .files.animate > li:nth-child(n+7) { animation-delay: calc(var(--ui-stagger) * 6); }
+.tree .row, .tree .file { transition: background-color var(--ui-fast) var(--ui-ease-standard), color var(--ui-fast) var(--ui-ease-standard), padding-left var(--ui-base) var(--ui-ease-standard); }
+.tree .chev { transition: transform var(--ui-base) var(--ui-ease-standard); }
+
+/* Status bar: its items step in with a small scale. */
+.status > * { animation: status-in var(--ui-base) var(--ui-ease-standard) both; }
+.status > :nth-child(2) { animation-delay: calc(var(--ui-stagger) * 1); }
+.status > :nth-child(3) { animation-delay: calc(var(--ui-stagger) * 2); }
+.status > :nth-child(4) { animation-delay: calc(var(--ui-stagger) * 3); }
+.status > :nth-child(n+5) { animation-delay: calc(var(--ui-stagger) * 4); }
+
+/* Panels and menus use the same landing. */
+.panel-body:not([hidden]) { animation: ui-rise var(--ui-base) var(--ui-ease-standard); }
+.empty-state:not([hidden]) { animation: ui-rise var(--ui-enter) var(--ui-ease-standard); }
+.clients:not([hidden]), .clients-menu:not([hidden]) { animation: pop-in var(--ui-base) var(--ui-ease-standard); }
+.confirm:not([hidden]) .confirm-box, .ask:not([hidden]) .ask-box { animation: pop-in var(--ui-base) var(--ui-ease-standard); }
+
+/* The keyboard's place: most buttons drop the browser's outline (it showed on every mouse click), so a key press
+   that moves focus gets this ring instead. Mouse clicks do not show it. */
+:is(button, select, a, [role="switch"], [tabindex]):focus-visible { outline: 2px solid #6b6b6b; outline-offset: 2px; }
+.set-row { transition: opacity 0.16s ease; }
+
+/* A narrow window: the page names give way to their icons, so the window buttons at the right stay on screen. */
+.titlebar { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+@media (max-width: 980px) {
+  .nav-tabs button { gap: 0; padding: 0 10px; font-size: 0; }
+}
+.empty-state::-webkit-scrollbar { width: 8px; }
+.empty-state::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 4px; }
+
+/* Settings > Account: who is logged in, and the computer the account is locked to. */
+.discord-face { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: 50%; overflow: hidden; background: #242424; color: #d6d6d6; font-size: 15px; font-weight: 700; }
+.discord-face img { width: 100%; height: 100%; object-fit: cover; }
+.discord-face .ic { width: 16px; height: 16px; color: #8a8a8a; }
+.set-row .mc-get { flex: none; }
+.set-row .mc-get.primary { background: #e7e7ea; color: #111113; }
+.set-row .mc-get.primary:hover { background: #ffffff; }
+.set-row .mc-get[hidden] { display: none; }
+#settings-body .mc-card.off > * { opacity: 0.45; }      /* on the rows: the card's entrance animation holds its own opacity */
+.redeem-input:disabled { opacity: 0.5; cursor: not-allowed; }
