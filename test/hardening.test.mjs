@@ -37,7 +37,7 @@ writeFileSync(join(files, 'dll.enc'), DLL_ENC);
 const env = {
   ...process.env, GRAPE_DATA: data, GRAPE_PORT: String(port), GRAPE_NO_PAGES: '1', GRAPE_DEV: '0',
   GRAPE_SETUP_STUB: join(files, 'grape-setup.exe'), GRAPE_APP_EXE: join(files, 'Grape.exe'), GRAPE_APP_VERSION_FILE: join(files, 'version.json'),
-  GRAPE_STUB_ENC: join(files, 'stub.enc'), GRAPE_DLL_ENC: join(files, 'dll.enc'),
+  GRAPE_STUB_ENC: join(files, 'stub.enc'), GRAPE_DLL_ENC: join(files, 'dll.enc'), GRAPE_PAY_TICK_MS: '0',
   GRAPE_PAYLOAD: join(files, 'agent-legacy.jar'), GRAPE_PAYLOAD_ENC: join(files, 'agent-new.jar.enc'), GRAPE_RESOURCE_KEY_FILE: join(files, 'resource.key'),
 };
 let server;
@@ -486,4 +486,61 @@ test('an update is offered only to a loader that is behind, with a license, and 
   // the download route turns away what it does not know
   const got = await fetchBytes('GET', '/v1/update/file/' + 'z'.repeat(32));
   assert.equal(got.status, 403);
+});
+
+// ---- the buy window's WebSocket: its owner hears its order at once, nobody else gets in
+
+test('a payment\'s page hears its order over a WebSocket; another person, no login, or another site gets nothing', async () => {
+  // no blockchain is reached: the payment settings point nowhere, and nothing runs by itself (GRAPE_PAY_TICK_MS=0)
+  writeFileSync(join(data, 'payment-settings.json'), JSON.stringify({ bsc_rpc: 'https://127.0.0.1:1/', bsc_wss: '', ltc_wss: '' }));
+  const buyer = '700000000000000007', other = '700000000000000008';
+  const db = JSON.parse(readFileSync(join(data, 'users.json'), 'utf8'));
+  db[buyer] = { username: 'buyer', plan: null, expires: 0 };
+  db[other] = { username: 'other', plan: null, expires: 0 };
+  writeFileSync(join(data, 'users.json'), JSON.stringify(db));
+  const made = spawnSync(process.execPath, ['-e', `
+    const core = require(${JSON.stringify(join(root, 'lib', 'core.js'))});
+    try { core.payments.importWallet('test test test test test test test test test test test junk'); } catch {}
+    (async () => {
+      const out = await core.sitePay(core.signCookie('site', '${buyer}', 1), 'create', { plan: 'week', coin: 'usdt_bsc' }, '9.9.9.1');
+      console.log(JSON.stringify({ status: out.status, id: out.body.order && out.body.order.id, error: out.body.error,
+        mine: core.signCookie('site', '${buyer}', 1), theirs: core.signCookie('site', '${other}', 1) }));
+    })();`], { env, encoding: 'utf8' });
+  assert.equal(made.status, 0, made.stderr);
+  const order = JSON.parse(made.stdout.trim().split('\n').pop());
+  assert.equal(order.status, 200, order.error);
+
+  const here = `http://127.0.0.1:${port}`;
+  const open = (cookie, origin = here, id = order.id) => new Promise((resolve) => {
+    const s = net.connect(port, '127.0.0.1', () => s.write(
+      `GET /v1/pay/ws?id=${id} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nOrigin: ${origin}\r\n${cookie ? 'Cookie: grape_site=' + encodeURIComponent(cookie) + '\r\n' : ''}\r\n`));
+    let buf = Buffer.alloc(0);
+    s.on('error', () => {});
+    s.on('data', (chunk) => {
+      buf = Buffer.concat([buf, chunk]);
+      const end = buf.indexOf('\r\n\r\n');
+      if (end < 0) return;
+      const head = buf.subarray(0, end).toString();
+      if (!head.startsWith('HTTP/1.1 101')) { s.destroy(); return resolve({ status: Number(head.split(' ')[1]) }); }
+      const body = buf.subarray(end + 4);
+      if (body.length < 4) return;
+      let len = body[1] & 0x7f, at = 2;
+      if (len === 126) { len = body.readUInt16BE(2); at = 4; }
+      if (body.length < at + len) return;
+      s.destroy();
+      resolve({ status: 101, opcode: body[0] & 0x0f, message: JSON.parse(body.subarray(at, at + len).toString()) });
+    });
+    setTimeout(() => { s.destroy(); resolve({ status: 0 }); }, 5000);
+  });
+
+  const mine = await open(order.mine);
+  assert.equal(mine.status, 101, 'the owner is let in');
+  assert.equal(mine.opcode, 1);
+  assert.equal(mine.message.type, 'order');
+  assert.equal(mine.message.order.id, order.id, 'and hears the order at once');
+  assert.equal(mine.message.order.amount, '2');
+  assert.equal((await open(order.theirs)).status, 403, "another person's order is not theirs to hear");
+  assert.equal((await open('')).status, 403, 'nobody without a login');
+  assert.equal((await open(order.mine, 'https://evil.example')).status, 403, 'not from another site');
+  assert.equal((await open(order.mine, here, 'nonexistent')).status, 403, 'an order that does not exist');
 });

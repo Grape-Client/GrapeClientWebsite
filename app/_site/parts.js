@@ -2,6 +2,7 @@
 // server.js puts the running instance there, with its logins and settings.
 import { cookies } from 'next/headers';
 import { DownloadButton, DownloadModal } from './DownloadModal';
+import { BuyModal } from './BuyModal';
 
 export const grape = () => globalThis.grape;
 export const Ic = ({ name }) => <i className="ic" style={{ '--i': `url(/grape/icons/${name}.svg)` }} />;
@@ -46,7 +47,7 @@ export function Nav({ user, site, ready }) {
         </nav>
         <span className="grow" />
         {user ? (
-          <div className="who"><Face user={user} />{user.name}<a className="out" href="/logout">Log out</a></div>
+          <div className="who"><a className="who-link" href="/dashboard" title="Your account"><Face user={user} />{user.name}</a><a className="out" href="/logout">Log out</a></div>
         ) : (
           <a className="pill dark" href="/login/discord?back=/"><Ic name="discord" />Log in</a>
         )}
@@ -54,6 +55,7 @@ export function Nav({ user, site, ready }) {
       </div>
     </header>
     <DownloadModal />
+    <BuyModal />
     </>
   );
 }
@@ -67,7 +69,7 @@ export function Foot({ user, site }) {
           <p>Java scripts for Minecraft, written, checked and run from one window.</p>
         </div>
         <div><h3>Grape</h3><ul><li><a href="/install">Download</a></li><li><a href="/#features">Features</a></li><li><a href="/#plans">Plans</a></li><li><a href="/#faq">Questions</a></li></ul></div>
-        <div><h3>Account</h3><ul>{user ? <li><a href="/logout">Log out</a></li> : <li><a href="/login/discord?back=/">Log in with Discord</a></li>}</ul></div>
+        <div><h3>Account</h3><ul>{user ? <><li><a href="/dashboard">Your account</a></li><li><a href="/logout">Log out</a></li></> : <li><a href="/login/discord?back=/dashboard">Log in with Discord</a></li>}</ul></div>
         <div><h3>Legal</h3><ul><li><a href="/terms">Terms of Service</a></li>{site.discord_url && <li><a href={site.discord_url} rel="noreferrer">Discord</a></li>}</ul></div>
       </div>
       <div className="foot-base"><span>&copy; {new Date().getFullYear()} Grape</span><span>Not affiliated with Mojang or Microsoft.</span></div>

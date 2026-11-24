@@ -144,7 +144,7 @@ export function DownloadModal() {
             <h3>Need time on your account?</h3>
             <p>Grape runs on keys. Every plan is all of Grape, they only differ in how long.</p>
           </div>
-          <a className="btn main" href="/#plans" onClick={close}>See plans</a>
+          <a className="btn main" href="/?buy=month" onClick={(e) => { e.preventDefault(); close(); setTimeout(() => window.dispatchEvent(new CustomEvent('grape-buy', { detail: { plan: 'month' } })), 50); }}>Buy time</a>
         </div>
 
         <p className="dl-label">Get your installer</p>

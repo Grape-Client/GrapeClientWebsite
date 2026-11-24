@@ -565,7 +565,7 @@ function Settings({ section, plans, ui }) {
     if (!site) return <p className="mc-none">Loading...</p>;
     const save = async () => {
       setBusy(true);
-      try { setSite(await call('save-site', site)); ui.toast('Saved', 'ok'); } catch (e) { ui.toast(e.message); }
+      try { setSite(await call('save-site', { discord_url: site.discord_url, download_url: site.download_url })); ui.toast('Saved', 'ok'); } catch (e) { ui.toast(e.message); }
       setBusy(false);
     };
     const price = (id) => (v) => setSite((s) => ({ ...s, prices: { ...s.prices, [id]: v } }));
@@ -577,12 +577,7 @@ function Settings({ section, plans, ui }) {
           <Field icon="download" title="Download" sub="Where Download for Windows goes. Empty: the button waits" value={site.download_url} onChange={(v) => setSite((s) => ({ ...s, download_url: v }))} placeholder="https://..." />
           <Field icon="discord" title="Discord Invite" sub="The Discord buttons of the landing page" value={site.discord_url} onChange={(v) => setSite((s) => ({ ...s, discord_url: v }))} placeholder="https://discord.gg/..." />
         </div>
-        <h6>PRICES</h6>
-        <div className="mc-card set-card">
-          {plans.map((p) => (
-            <Field key={p.id} icon="layers" title={p.name} sub={(p.days === null ? 'Forever' : p.days + ' days') + '. Empty: shown without a price'} value={site.prices[p.id] || ''} onChange={price(p.id)} placeholder="$4.99" />
-          ))}
-        </div>
+        <p className="admin-hint">The plans&apos; prices are set in Payments &gt; Prices.</p>
         <div className="admin-actions"><button className="mc-get admin-primary" disabled={busy} onClick={save}>{busy ? 'Saving...' : 'Save'}</button></div>
       </>
     );
@@ -724,6 +719,264 @@ function Installers({ section, ui, link, setLink }) {
   );
 }
 
+// ------------------------------------------------------------------ Payments (USDT BEP20 and Litecoin)
+
+const PAY_STATES = { waiting: ['Waiting', ''], seen: ['Seen', ''], partial: ['Underpaid', 'bad'], crediting: ['Adding time', ''], paid: ['Paid', 'good'], expired: ['Expired', ''], error: ['Needs you', 'bad'] };
+const COIN_IDS = ['usdt_bsc', 'ltc'];
+const short = (a) => (a && a.length > 20 ? a.slice(0, 10) + '...' + a.slice(-6) : a || '');
+
+function Payments({ section, ui }) {
+  const [st, setSt] = useState(null);               // the payments state: wallet, collectors, balances, settings
+  const [lists, setLists] = useState(null);         // {orders, cashouts}
+  const [form, setForm] = useState(null);           // the settings being edited
+  const [prices, setPrices] = useState(null);
+  const [password, setPassword] = useState('');
+  const [seed, setSeed] = useState(null);           // the words of a wallet just made: shown once
+  const [busy, setBusy] = useState('');
+
+  const load = useCallback(() => call('payments').then((s) => { setSt(s); setForm((f) => f || JSON.parse(JSON.stringify(s.settings))); }).catch((e) => ui.toast(e.message)), [ui]);
+  const loadLists = useCallback(() => call('payments-orders').then(setLists).catch((e) => ui.toast(e.message)), [ui]);
+  useEffect(() => {
+    if (section === 'prices') { call('prices').then((d) => setPrices(d.plans)).catch((e) => ui.toast(e.message)); return undefined; }
+    load();
+    if (section === 'orders' || section === 'overview') loadLists();
+    if (section !== 'overview' && section !== 'orders') return undefined;
+    const t = setInterval(() => { load(); loadLists(); }, 15000);
+    return () => clearInterval(t);
+  }, [section, load, loadLists, ui]);
+
+  const copy = async (text, what) => { if (await copyText(text)) ui.toast(what + ' copied', 'ok'); else ui.toast('Could not copy: select it and copy it yourself.'); };
+  const act = async (name, work) => {
+    setBusy(name);
+    try { await work(); } catch (e) { ui.toast(e.message); }
+    setBusy('');
+  };
+
+  // ---- prices
+  if (section === 'prices') {
+    if (!prices) return <p className="mc-none">Loading...</p>;
+    const save = () => act('prices', async () => {
+      const out = await call('save-prices', { prices: Object.fromEntries(prices.map((p) => [p.id, String(p.price).replace(/[$\s]/g, '')])) });
+      setPrices(out.plans);
+      ui.toast('Prices saved: the website and new payments use them now', 'ok');
+    });
+    return (
+      <>
+        <h2>Prices</h2>
+        <div className="mc-card set-card">
+          {prices.map((p) => (
+            <Field key={p.id} icon="layers" title={p.name} sub={`In US dollars. USDT is asked at this price; Litecoin at its rate when the payment is made`}
+              value={String(p.price || '').replace(/^\$/, '')} placeholder={String(p.usd || '')} onChange={(v) => setPrices((all) => all.map((x) => (x.id === p.id ? { ...x, price: v } : x)))} />
+          ))}
+        </div>
+        <div className="admin-actions"><button className="mc-get admin-primary" disabled={busy === 'prices'} onClick={save}>{busy === 'prices' ? 'Saving...' : 'Save prices'}</button></div>
+        <p className="admin-hint">The landing page, the buy window and every new payment use these. A payment that is already open keeps the price it was made with.</p>
+      </>
+    );
+  }
+
+  if (!st || !form) return <p className="mc-none">Loading...</p>;
+
+  // ---- the wallet
+  if (section === 'wallet') {
+    const create = () => act('wallet', async () => {
+      const made = await call('payments-create-wallet', { password });
+      setPassword('');
+      setSeed(made.mnemonic);
+      load();
+    });
+    if (seed) {
+      return (
+        <>
+          <h2>Your Wallet&apos;s Words</h2>
+          <div className="mc-card set-card admin-seed">
+            {seed.split(' ').map((w, i) => <span key={i}><i>{i + 1}</i>{w}</span>)}
+          </div>
+          <p className="admin-hint">Write these 24 words down on paper, in order, and keep them offline. They are the only way to get the money back if the server is lost. They are not shown again. Whoever has them can take every coin this wallet receives.</p>
+          <div className="admin-actions"><button className="mc-get admin-primary" onClick={() => setSeed(null)}>I wrote them down</button></div>
+        </>
+      );
+    }
+    if (!st.wallet) {
+      return (
+        <>
+          <h2>Wallet</h2>
+          <div className="mc-card set-card">
+            <Row icon="eye-off" title="No payment wallet yet" sub="One wallet, from 24 words, gives every payment its own address and holds the collectors" />
+            <Field icon="eye-off" title="Admin Password" sub="To make the wallet" type="password" value={password} onChange={setPassword} />
+          </div>
+          <div className="admin-actions"><button className="mc-get admin-primary" disabled={!password || busy === 'wallet'} onClick={create}>{busy === 'wallet' ? 'Making...' : 'Make the wallet'}</button></div>
+          <p className="admin-hint">The server keeps the words in data/wallet.json (and in your encrypted backups). You see them once, right after this. You can also make it on the server: node server.js wallet-init.</p>
+        </>
+      );
+    }
+    return (
+      <>
+        <h2>Wallet</h2>
+        <div className="mc-card set-card">
+          <Row icon="check" title="Payment wallet" sub={'Made ' + dateOf(st.wallet_created)}><b className="set-value good">Ready</b></Row>
+          {COIN_IDS.map((c) => (
+            <Row key={c} icon="layers" title={st.coins[c].symbol + ' collector'} sub={st.collectors[c]}>
+              <button className="mc-get" onClick={() => copy(st.collectors[c], 'Address')}>Copy</button>
+            </Row>
+          ))}
+        </div>
+        <p className="admin-hint">The words are not shown again. To move the wallet to another server, restore an encrypted backup there (node server.js restore), or import the words: node server.js wallet-import.</p>
+      </>
+    );
+  }
+
+  // ---- the settings
+  if (section === 'settings') {
+    const set = (group, coin) => (v) => setForm((f) => ({ ...f, [group]: { ...f[group], [coin]: v } }));
+    const changing = COIN_IDS.some((c) => (form.payout[c] || '') !== (st.settings.payout[c] || ''));
+    const save = () => act('settings', async () => {
+      const out = await call('save-payments', { ...form, password });
+      setPassword('');
+      setForm(JSON.parse(JSON.stringify(out.settings)));
+      load();
+      ui.toast('Saved', 'ok');
+    });
+    const cashOut = (c) => act('cash-' + c, async () => {
+      if (!(await ui.confirm({ icon: 'arrow-up-right', title: 'Cash out ' + st.coins[c].symbol, text: `Send everything the ${st.coins[c].symbol} collector holds to ${st.settings.payout[c]}?`, ok: 'Cash out' }))) return;
+      const out = await call('payments-cash-out', { coin: c });
+      ui.toast(out.nothing ? 'The collector is empty: nothing to send' : `Sent ${out.amount} ${out.symbol}`, out.nothing ? undefined : 'ok');
+      load();
+    });
+    return (
+      <>
+        <h2>Payment Settings</h2>
+        {COIN_IDS.map((c) => {
+          const coin = st.coins[c];
+          return (
+            <div key={c}>
+              <h6>{c === 'ltc' ? 'LITECOIN' : 'USDT ON BNB SMART CHAIN (BEP20)'}</h6>
+              <div className="mc-card set-card">
+                <Row icon="check" title={'Accept ' + coin.symbol} sub="Shown in the buy window">
+                  <Switch label={'Accept ' + coin.symbol} on={!!form.enabled[c]} onChange={set('enabled', c)} />
+                </Row>
+                <Field icon="arrow-up-right" title="Your Main Address" sub={c === 'ltc' ? 'Where cash-outs go: ltc1..., L... or M...' : 'Where cash-outs go: a BEP20 address (0x...)'} value={form.payout[c] || ''} onChange={set('payout', c)} placeholder={c === 'ltc' ? 'ltc1q...' : '0x...'} />
+                <Row icon="rotate-cw" title="Auto Cash-Out" sub="Send the collector's money to your main address by itself, once the minimum has gathered">
+                  <Switch label="Auto cash-out" on={!!form.auto[c]} onChange={set('auto', c)} />
+                </Row>
+                <Field icon="layers" title={'Minimum For Auto Cash-Out (' + coin.symbol + ')'} sub="Fewer, bigger transfers pay less in fees" value={String(form.min_cashout[c])} onChange={set('min_cashout', c)} />
+                <Field icon="history" title="Confirmations" sub={c === 'ltc' ? 'Blocks before a payment counts (about 2.5 min each)' : 'Blocks before a payment counts (under a second each)'} value={String(form.confirmations[c])} onChange={set('confirmations', c)} />
+                <Row icon="arrow-up-right" title="Cash Out Now" sub={st.settings.payout[c] ? 'Everything the collector holds, to ' + short(st.settings.payout[c]) : 'Save a main address first'}>
+                  <button className="mc-get" disabled={!st.settings.payout[c] || busy === 'cash-' + c} onClick={() => cashOut(c)}>{busy === 'cash-' + c ? 'Sending...' : 'Cash out'}</button>
+                </Row>
+              </div>
+            </div>
+          );
+        })}
+        <h6>ADVANCED</h6>
+        <div className="mc-card set-card">
+          <Field icon="clock" title="Time To Pay (minutes)" sub="How long a payment's address and Litecoin rate are offered" value={String(form.order_minutes)} onChange={(v) => setForm((f) => ({ ...f, order_minutes: v }))} />
+          <Field icon="earth" title="BSC Live (WebSocket)" sub="New blocks and transfers as they happen. Empty: look every 20 s" value={form.bsc_wss} onChange={(v) => setForm((f) => ({ ...f, bsc_wss: v }))} />
+          <Field icon="earth" title="BSC RPC" sub="Balances and sending" value={form.bsc_rpc} onChange={(v) => setForm((f) => ({ ...f, bsc_rpc: v }))} />
+          <Field icon="earth" title="Litecoin Live (WebSocket)" sub="New blocks and the payment addresses as they change. Empty: look every 20 s" value={form.ltc_wss} onChange={(v) => setForm((f) => ({ ...f, ltc_wss: v }))} />
+          <Field icon="earth" title="Litecoin API" sub="A mempool.space-style API: addresses, fees, sending" value={form.ltc_api} onChange={(v) => setForm((f) => ({ ...f, ltc_api: v }))} />
+        </div>
+        {changing && (
+          <div className="mc-card set-card">
+            <Field icon="eye-off" title="Admin Password" sub="Needed to change a main address" type="password" value={password} onChange={setPassword} />
+          </div>
+        )}
+        <div className="admin-actions"><button className="mc-get admin-primary" disabled={busy === 'settings' || (changing && !password)} onClick={save}>{busy === 'settings' ? 'Saving...' : 'Save'}</button></div>
+      </>
+    );
+  }
+
+  // ---- the orders
+  const credit = (o) => act('credit-' + o.id, async () => {
+    if (!(await ui.confirm({ icon: 'check', title: 'Add the time', text: `Give ${o.user_name || o.user} the ${o.plan_name}, although ${o.received} of ${o.amount} ${o.symbol} arrived?`, ok: 'Add the time' }))) return;
+    await call('payments-credit', { id: o.id });
+    ui.toast('Time added', 'ok');
+    loadLists();
+  });
+  const retry = (o) => act('sweep-' + o.id, async () => { await call('payments-sweep', { id: o.id }); ui.toast('It will be tried again within 20 seconds', 'ok'); loadLists(); });
+  const orderRows = (list) => (
+    <div className="mc-card set-card">
+      {list.map((o) => {
+        const [text, tone] = PAY_STATES[o.status] || [o.status, ''];
+        return (
+          <Row key={o.id} icon={o.status === 'paid' ? 'check' : o.status === 'partial' || o.status === 'error' ? 'triangle-alert' : 'clock'}
+            title={`${o.user_name || o.user}  ·  ${o.plan_name}  ·  ${o.amount} ${o.symbol} ($${o.usd})`}
+            sub={`${timeOf(o.created)}  ·  ${short(o.address)}${o.status !== 'paid' && o.received !== '0' ? `  ·  ${o.received} arrived` : ''}${o.status === 'paid' ? (o.swept ? '  ·  moved to the collector' : o.sweep_error ? '  ·  not moved: ' + o.sweep_error : '  ·  moving...') : ''}${o.note ? '  ·  ' + o.note : ''}${o.paid_how === 'admin' ? '  ·  added by you' : ''}`}>
+            <b className={'set-value ' + tone}>{text}</b>
+            <a className="mc-get" href={o.explorer} target="_blank" rel="noreferrer">View</a>
+            {['partial', 'waiting', 'seen', 'error', 'expired'].includes(o.status) && o.received !== '0' && <button className="mc-get" disabled={busy === 'credit-' + o.id} onClick={() => credit(o)}>Add time</button>}
+            {o.status === 'paid' && !o.swept && o.sweep_error && <button className="mc-get" disabled={busy === 'sweep-' + o.id} onClick={() => retry(o)}>Try again</button>}
+          </Row>
+        );
+      })}
+    </div>
+  );
+
+  if (section === 'orders') {
+    return (
+      <>
+        <h2>Orders</h2>
+        <div className="admin-tools"><span className="grow" /><button className="mc-get" onClick={loadLists}>Refresh</button></div>
+        {!lists ? <p className="mc-none">Loading...</p> : !lists.orders.length ? <p className="mc-none">No payments yet.</p> : orderRows(lists.orders)}
+      </>
+    );
+  }
+
+  // ---- the overview
+  if (!st.wallet) {
+    return (
+      <>
+        <h2>Payments</h2>
+        <p className="admin-hint">There is no payment wallet yet: nobody can buy until there is one. Make it in Wallet, then set your main addresses in Settings.</p>
+      </>
+    );
+  }
+  const b = st.balances || {};
+  return (
+    <>
+      <h2>Payments</h2>
+      <div className="home-grid">
+        <div className="home-card"><span>Paid orders</span><b>{st.stats.paid}</b></div>
+        <div className="home-card right"><span>Earned</span><b>${st.stats.usd.toFixed(2).replace(/\.00$/, '')}</b></div>
+        <div className="home-card"><span>Waiting now</span><b>{st.stats.open}</b></div>
+        <div className="home-card right"><span>Live</span><b className={st.live.bsc || st.live.ltc ? 'good' : ''}>{[st.live.bsc && 'BSC', st.live.ltc && 'LTC'].filter(Boolean).join(' + ') || 'Idle'}</b></div>
+      </div>
+      <h6>COLLECTORS</h6>
+      <div className="mc-card set-card">
+        <Row icon="layers" title={'USDT  ·  ' + (b.usdt_bsc && !b.usdt_bsc.error ? b.usdt_bsc.amount + ' USDT' : '-')} sub={st.collectors.usdt_bsc}>
+          <button className="mc-get" onClick={() => copy(st.collectors.usdt_bsc, 'Address')}>Copy</button>
+        </Row>
+        <Row icon={b.usdt_bsc && b.usdt_bsc.gas_low ? 'triangle-alert' : 'zap'} title={'Gas  ·  ' + (b.usdt_bsc && !b.usdt_bsc.error ? b.usdt_bsc.bnb + ' BNB' : '-')}
+          sub={b.usdt_bsc && b.usdt_bsc.gas_low ? 'Low: send a little BNB (BEP20) to the USDT collector above. It pays the gas of every USDT payment' : 'Pays the gas that moves each USDT payment to the collector'}>
+          <b className={'set-value ' + (b.usdt_bsc && b.usdt_bsc.gas_low ? 'bad' : 'good')}>{b.usdt_bsc && b.usdt_bsc.gas_low ? 'Low' : 'OK'}</b>
+        </Row>
+        <Row icon="layers" title={'LTC  ·  ' + (b.ltc && !b.ltc.error ? b.ltc.amount + ' LTC' : '-')} sub={st.collectors.ltc}>
+          <button className="mc-get" onClick={() => copy(st.collectors.ltc, 'Address')}>Copy</button>
+        </Row>
+      </div>
+      {(b.usdt_bsc && b.usdt_bsc.error) || (b.ltc && b.ltc.error) ? <p className="admin-hint">Could not read a balance: {(b.usdt_bsc && b.usdt_bsc.error) || (b.ltc && b.ltc.error)}</p> : null}
+      {lists && lists.orders.some((o) => ['partial', 'error'].includes(o.status) || (o.status === 'paid' && o.sweep_error)) && (
+        <>
+          <h6>NEEDS YOU</h6>
+          {orderRows(lists.orders.filter((o) => ['partial', 'error'].includes(o.status) || (o.status === 'paid' && o.sweep_error)))}
+        </>
+      )}
+      {lists && lists.cashouts.length > 0 && (
+        <>
+          <h6>CASH-OUTS</h6>
+          <div className="mc-card set-card">
+            {lists.cashouts.slice(0, 10).map((x) => (
+              <Row key={x.tx + x.at} icon="arrow-up-right" title={`${x.amount} ${x.symbol}${x.auto ? '  ·  auto' : ''}`} sub={`${timeOf(x.at)}  ·  to ${short(x.to)}`}>
+                <a className="mc-get" href={x.explorer} target="_blank" rel="noreferrer">View</a>
+              </Row>
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 // ------------------------------------------------------------------ the window
 
 const PAGES = {
@@ -731,6 +984,7 @@ const PAGES = {
   keys: { title: 'Keys', icon: 'sparkles', sections: [['make', 'Make Keys', 'plus'], ['list', 'All Keys', 'layout-list']] },
   users: { title: 'Users', icon: 'earth', sections: [['users', 'Users', 'earth'], ['computers', 'Computers', 'cpu']] },
   installers: { title: 'Installers', icon: 'download', sections: [['make', 'Make Installer', 'plus'], ['list', 'All Installers', 'layout-list']] },
+  payments: { title: 'Payments', icon: 'zap', sections: [['overview', 'Overview', 'layers'], ['orders', 'Orders', 'layout-list'], ['prices', 'Prices', 'pencil'], ['settings', 'Settings', 'sliders-horizontal'], ['wallet', 'Wallet', 'eye-off']] },
   settings: { title: 'Settings', icon: 'settings', sections: [['discord', 'Discord', 'discord'], ['website', 'Website', 'download'], ['security', 'Security', 'triangle-alert'], ['password', 'Admin Password', 'eye-off']] },
 };
 
@@ -738,7 +992,7 @@ export default function AdminApp({ setup }) {
   const ui = useDialogs();
   const [auth, setAuth] = useState(null);          // {ready, authed}
   const [page, setPage] = useState('home');
-  const [sections, setSections] = useState({ home: 'overview', keys: 'make', users: 'users', installers: 'make', settings: 'discord' });
+  const [sections, setSections] = useState({ home: 'overview', keys: 'make', users: 'users', installers: 'make', payments: 'overview', settings: 'discord' });
   const [narrow, setNarrow] = useState(false);
   const [plans, setPlans] = useState([]);
   const [overview, setOverview] = useState(null);
@@ -796,6 +1050,7 @@ export default function AdminApp({ setup }) {
           {page === 'home' && <Home section={section} data={overview} />}
           {page === 'keys' && <Keys section={section} plans={plans} ui={uiApi} made={made} setMade={setMade} />}
           {page === 'users' && <Users section={section} plans={plans} ui={uiApi} />}
+          {page === 'payments' && <Payments section={section} ui={uiApi} />}
           {page === 'installers' && <Installers section={section} ui={uiApi} link={installerLink} setLink={setInstallerLink} />}
           {page === 'settings' && <Settings section={section} plans={plans} ui={uiApi} />}
         </div>

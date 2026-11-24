@@ -22,7 +22,8 @@ const SECTIONS = [
   ]],
   ['Keys and time', [
     'A key adds time to your account. Each key can be used once. Nothing renews by itself: when your time ends, Grape locks until you redeem another key. Time that has been added stays on your account until it runs out.',
-    'Keys are sold through our Discord and by sellers we have approved. Unless the law where you live says otherwise, a key that has been redeemed is not refunded. Do not resell keys unless we have agreed to it.',
+    'You can buy time on this website with USDT on BNB Smart Chain (BEP20) or with Litecoin, or redeem a key. A crypto payment cannot be reversed: send exactly the amount shown, to the address shown, on the network shown. Coins sent on another network, or to another address, can be lost, and we may not be able to get them back. The time is added once the payment has the confirmations it needs; if less than the amount arrives, ask us and we will sort it out.',
+    'Keys are also sold through our Discord and by sellers we have approved. Unless the law where you live says otherwise, time that was paid for or redeemed is not refunded. Do not resell keys unless we have agreed to it.',
   ]],
   ['What you must not do', [
     'Do not take Grape apart to get around its license, its keys or its one-computer limit: no reverse engineering, decompiling, patching or debugging of Grape for that purpose, and no tools that fake a license or a computer. Where the law allows reverse engineering that we cannot forbid, you may do only that.',
@@ -37,7 +38,7 @@ const SECTIONS = [
     'We try to keep the Service running, but we do not promise it will always be available, and we may stop it for maintenance or for reasons outside our control.',
   ]],
   ['Your data', [
-    'What we keep: your Discord profile (id, username, display name, picture address); a one-way fingerprint of your computer, used to keep an account on one computer; the key you redeemed and the time on your account; which installers were made for you and when they were used; and server logs, which hold dates, your internet address, your Discord id and your computer’s id, and the name and size (not the contents) of scripts you run.',
+    'What we keep: your Discord profile (id, username, display name, picture address); a one-way fingerprint of your computer, used to keep an account on one computer; the key you redeemed and the time on your account; your payments (the plan, the coin, the amount and the address you paid to - payments on a blockchain are public); how many times a day you used Grape, for your dashboard; which installers were made for you and when they were used; and server logs, which hold dates, your internet address, your Discord id and your computer’s id, and the name and size (not the contents) of scripts you run.',
     'When you run a script, Grape sends the compiled script to our server, which checks your account and sends it back. We do not store the script. Your scripts, settings and files stay on your computer. The website uses a cookie to keep you logged in, and nothing for advertising or tracking.',
     'We use this to run the Service, to keep it safe and to stop abuse. We do not sell your data. It reaches Discord when you log in with Discord, and our hosting provider holds it for us. We keep it while your account exists and for as long as the logs are needed for security. To ask what we hold or to have it removed, contact us as described below.',
   ]],

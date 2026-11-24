@@ -4,6 +4,7 @@
 import { grape, Ic, SiteStyle, siteUser, Nav, Foot } from './_site/parts';
 import LiveWindow from './_site/LiveWindow';
 import { DownloadButton } from './_site/DownloadModal';
+import { BuyButton } from './_site/BuyModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,7 +55,6 @@ export default async function Landing() {
   const plans = g ? g.ops.plans() : [];
   const user = await siteUser();
   const length = (p) => (p.days === null ? 'Forever' : p.days === 1 ? '24 hours' : p.days + ' days');
-  const buy = site.discord_url || '/install';
   const ready = !!site.download_ready;
 
   return (
@@ -101,11 +101,11 @@ export default async function Landing() {
                 <span className="name">{p.name}</span>
                 <span className="price">{site.prices[p.id] || length(p)}</span>
                 <span className="length">{p.days === null ? 'No end date' : 'Of full access'}</span>
-                <a className={'btn ' + (p.id === 'month' ? 'main' : 'quiet')} href={buy} rel="noreferrer">Get a key</a>
+                <BuyButton plan={p.id} className={'btn ' + (p.id === 'month' ? 'main' : 'quiet')}>Buy {p.name}</BuyButton>
               </div>
             ))}
           </div>
-          <p className="note">Keys, not a subscription: nothing renews by itself. You redeem a key in the download window, or in Grape, after you log in.</p>
+          <p className="note">Pay with USDT (BEP20) or Litecoin: the time goes onto your Discord account as soon as the payment is confirmed. Nothing renews by itself. Have a key? Redeem it in the download window or in Grape.</p>
         </section>
 
         <section className="faq" id="faq">

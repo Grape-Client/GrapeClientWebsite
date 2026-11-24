@@ -66,6 +66,7 @@ function serve() {
   server.on('upgrade', (req, sock, head) => {
     sock.on('error', () => sock.destroy());            // a reset socket must never end the server (this covers Next's too)
     if (req.url === '/v1/ws') return core.upgrade(req, sock);
+    if (req.url.startsWith('/v1/pay/ws')) return core.payUpgrade(req, sock);     // the buy window: its payment, pushed live
     if (upgradeNext) return upgradeNext(req, sock, head);           // Next's own (the page reloads while developing)
     sock.destroy();
   });
