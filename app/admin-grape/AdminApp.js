@@ -617,9 +617,18 @@ function Installers({ section, ui, link, setLink }) {
   const [note, setNote] = useState('');
   const [hours, setHours] = useState(72);
   const [busy, setBusy] = useState(false);
+  const [limit, setLimit] = useState(null);          // installers one person may make a day from the website (0 = no limit)
 
   const load = useCallback(() => call('installers').then((d) => { setList(d.list); setStatus(d); }).catch((e) => ui.toast(e.message)), [ui]);
   useEffect(() => { load(); }, [section, load]);
+  useEffect(() => { call('installer-settings').then((s) => setLimit(s.limit)).catch(() => {}); }, [section]);
+  const saveLimit = async () => {
+    try { const s = await call('save-installer-limit', { limit }); setLimit(s.limit); ui.toast('Saved', 'ok'); } catch (e) { ui.toast(e.message); }
+  };
+  const resetLimits = async () => {
+    if (!(await ui.confirm({ icon: 'rotate-cw', title: 'Reset the counts', text: 'Everyone can make installers from the website again, as if they had made none today. The installers already made stay as they are.', ok: 'Reset' }))) return;
+    try { await call('reset-installer-limits'); ui.toast('Counts reset', 'ok'); } catch (e) { ui.toast(e.message); }
+  };
 
   const copy = async (text) => { if (await copyText(text)) ui.toast('Link copied', 'ok'); else ui.toast('Could not copy: select the link and copy it yourself.'); };
   const make = async () => {
@@ -649,6 +658,18 @@ function Installers({ section, ui, link, setLink }) {
           </Row>
           <Row icon="layers" title="Grape" sub={status && status.app ? `payload/Grape.exe  ·  ${(status.app_size / 1048576).toFixed(1)} MB${status.version ? '  ·  version ' + status.version : ''}` : 'payload/Grape.exe'}>
             <b className={'set-value ' + (!status ? '' : status.app ? 'good' : 'bad')}>{!status ? 'Checking' : status.app ? 'Ready' : 'Missing'}</b>
+          </Row>
+        </div>
+        <h6>THE WEBSITE'S DOWNLOAD BUTTON</h6>
+        <div className="mc-card set-card">
+          <Row icon="download" title="Installers Per Person Per Day" sub="How many a person can make from the download popup. 0 means no limit">
+            <div className="admin-count">
+              <Stepper label="Installers per day" value={limit === null ? 3 : limit} min={0} max={1000} onChange={setLimit} />
+              <button className="mc-get" disabled={limit === null} onClick={saveLimit}>Save</button>
+            </div>
+          </Row>
+          <Row icon="rotate-cw" title="Reset Today's Counts" sub="Lets everyone make installers again right now">
+            <button className="mc-get" onClick={resetLimits}>Reset</button>
           </Row>
         </div>
         <h6>NEW INSTALLER</h6>

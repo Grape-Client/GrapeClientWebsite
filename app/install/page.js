@@ -1,6 +1,7 @@
 // The download page: what you get, how the installer works, and what to do when Windows or the installer says no.
 import { grape, Ic, SiteStyle, siteUser, Nav, Foot, WindowsLogo } from '../_site/parts';
 import LiveWindow from '../_site/LiveWindow';
+import { DownloadButton } from '../_site/DownloadModal';
 
 export const dynamic = 'force-dynamic';
 export const metadata = {
@@ -9,8 +10,8 @@ export const metadata = {
 };
 
 const STEPS = [
-  ['Log in with Discord', 'The button above takes you to Discord and back. Grape only gets your public profile: your name, picture and id.'],
-  ['Get your installer', 'The server makes an installer just for you. It works once, on the first computer that starts it, so keep it to yourself. You can make three a day.'],
+  ['Log in with Discord', 'The download button opens a window that takes you to Discord and back. Grape only gets your public profile: your name, picture and id.'],
+  ['Get your installer', 'The server makes an installer just for you. It works once, on the first computer that starts it, so keep it to yourself. There is a limit of a few a day.'],
   ['Run it', 'Grape is put in its own folder, with a Desktop and a Start menu shortcut if you leave them on. The installer checks what it downloaded, adds Grape to Windows’ list of apps, and removes itself when it is done.'],
   ['Open Grape', 'Log in with Discord, redeem your key, and the window opens. The first start needs the internet: the server checks your account and unlocks the window.'],
 ];
@@ -19,7 +20,7 @@ const NEEDS = [['cpu', 'Windows 10 or 11, 64-bit'], ['earth', 'An internet conne
 
 const TROUBLE = [
   ['Windows says it protected my PC', 'The installer is not code-signed yet, so SmartScreen may warn about a file it has not seen often. If you downloaded it from this page, choose More info, then Run anyway.'],
-  ['The installer says it was already used', 'Each installer works once. Press the download button again for a new one (up to three a day).'],
+  ['The installer says it was already used', 'Each installer works once. Press the download button again for a new one (there is a limit per day).'],
   ['The installer cannot reach the server', 'Check your internet connection and the clock of your computer, then run the installer again: it can be started again on the same computer until it has finished.'],
   ['My antivirus removed the file', 'Restore it from the antivirus’ quarantine, or add Grape’s folder to its exceptions. A program that talks to games is sometimes flagged by mistake.'],
   ['How do I uninstall Grape?', 'Settings > Apps > Installed apps > Grape > Uninstall. Your scripts and settings are kept.'],
@@ -47,7 +48,7 @@ export default async function Install() {
             <p className="lead">Install Grape once and keep your scripts, clients and mods in one window. Your account is checked by Discord, and your installer is made for you.</p>
             {(have.version || size) && <p className="meta">{[have.version && 'Version ' + have.version, size].filter(Boolean).join('  ·  ')}</p>}
             <div className="ctas">
-              <a className="btn main" href="/download" aria-disabled={!ready}><WindowsLogo />{ready ? 'Download for Windows' : 'Download coming soon'}</a>
+              <DownloadButton className="btn main" disabled={!ready}><WindowsLogo />{ready ? 'Download for Windows' : 'Download coming soon'}</DownloadButton>
               <a className="textlink" href="#how">Installation guide<span aria-hidden="true"> &rsaquo;</span></a>
             </div>
             <p className="small">By downloading Grape you agree to the <a href="/terms">Terms of Service</a>.</p>

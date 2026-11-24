@@ -290,3 +290,49 @@ test('a backup opens only with its password and brings every file back', () => {
   assert.notEqual(again.status, 0, 'a folder that holds data is not replaced without --force');
   rmSync(elsewhere, { recursive: true, force: true });
 });
+
+// ---- the download popup's API, and the daily limit
+
+test('the download popup: log in first, then a few installers a day, and the admin can reset or change the limit', () => {
+  const user = '555666777888999000';
+  writeFileSync(join(data, 'users.json'), JSON.stringify({ [user]: { username: 'popup', global_name: 'Popup', plan: null, expires: 0 } }));
+  const run = spawnSync(process.execPath, ['-e', `
+    const core = require(${JSON.stringify(join(root, 'lib', 'core.js'))});
+    const cookie = core.signCookie('site', ${JSON.stringify(user)}, 1);
+    const ask = (action, c = cookie) => core.siteInstaller(c, action, '9.9.9.9');
+    const out = {};
+    out.state_anon = ask('state', '');
+    out.make_anon = ask('make', '').status;
+    out.state_user = ask('state');
+    out.makes = [1, 2, 3].map(() => ask('make').status);
+    const fourth = ask('make');
+    out.fourth = { status: fourth.status, limit: fourth.body.limit, mentions: /most for one day/.test(fourth.body.error), left: fourth.body.quota.left };
+    core.ops.resetInstallerLimits();
+    out.after_reset = ask('make').status;
+    core.ops.saveInstallerLimit(0);
+    out.unlimited = [1, 2, 3, 4, 5].map(() => ask('make').status);
+    core.ops.saveInstallerLimit(1);
+    out.one = { count: core.installer.quota(${JSON.stringify(user)}, core.installerLimits()).left, make: ask('make').status };
+    out.bad = ['-1', 'abc', '1001', ''].map((v) => { try { core.ops.saveInstallerLimit(v); return 'accepted'; } catch { return 'refused'; } });
+    core.ops.saveInstallerLimit(3);
+    core.ops.resetInstallerLimits();
+    out.url = ask('make').body.url;
+    out.bad_action = ask('nonsense').status;
+    console.log(JSON.stringify(out));`], { env, encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  const out = JSON.parse(run.stdout.trim().split('\n').pop());
+  assert.equal(out.state_anon.body.user, null, 'a visitor is not logged in');
+  assert.equal(out.state_anon.body.ready, true, 'the installer and Grape are there');
+  assert.equal(out.state_anon.body.quota, null);
+  assert.equal(out.make_anon, 401, 'no installer without a login');
+  assert.equal(out.state_user.body.user.name, 'Popup');
+  assert.deepEqual(out.state_user.body.quota, { used: 0, limit: 3, left: 3 });
+  assert.deepEqual(out.makes, [200, 200, 200]);
+  assert.deepEqual(out.fourth, { status: 429, limit: true, mentions: true, left: 0 }, 'the fourth in a day is refused, with words for the popup');
+  assert.equal(out.after_reset, 200, 'a reset lets them make one again');
+  assert.deepEqual(out.unlimited, [200, 200, 200, 200, 200], 'a limit of 0 is no limit');
+  assert.deepEqual(out.one, { count: 0, make: 429 }, 'a limit of 1 with installers already made today');
+  assert.deepEqual(out.bad, ['refused', 'refused', 'refused', 'refused']);
+  assert.match(out.url, /^\/get\/[\w-]{32}$/);
+  assert.equal(out.bad_action, 400);
+});

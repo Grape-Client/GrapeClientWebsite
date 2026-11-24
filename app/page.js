@@ -3,6 +3,7 @@
 // Prices, the download link and the Discord invite come from the admin page (Settings > Website).
 import { grape, Ic, SiteStyle, siteUser, Nav, Foot } from './_site/parts';
 import LiveWindow from './_site/LiveWindow';
+import { DownloadButton } from './_site/DownloadModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,7 +67,7 @@ export default async function Landing() {
           <h1>Script Minecraft in real Java.</h1>
           <p className="lead">Grape is a desktop editor that compiles your scripts against the game you are playing and runs them inside it. Clients, versions and mods live in the same window.</p>
           <div className="ctas">
-            <a className="btn main" href="/install">Download for Windows</a>
+            <DownloadButton className="btn main" disabled={!ready}>{ready ? 'Download for Windows' : 'Download coming soon'}</DownloadButton>
             <a className="btn quiet" href="#plans">See plans</a>
           </div>
           <p className="small">For Windows 10 and 11. You log in with Discord. Using Grape means you agree to the <a href="/terms">Terms of Service</a>.</p>
@@ -120,7 +121,7 @@ export default async function Landing() {
           <h2>Ready to write your first script?</h2>
           <p>Download Grape, log in with Discord, and start.</p>
           <div className="ctas">
-            <a className="btn main" href="/install">Download for Windows</a>
+            <DownloadButton className="btn main" disabled={!ready}>{ready ? 'Download for Windows' : 'Download coming soon'}</DownloadButton>
             {site.discord_url && <a className="btn quiet" href={site.discord_url} rel="noreferrer"><Ic name="discord" />Join the Discord</a>}
           </div>
         </section>

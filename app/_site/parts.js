@@ -1,6 +1,7 @@
 // Small pieces of the website shared by its pages. The server's core (lib/core.js) is reached through globalThis.grape:
 // server.js puts the running instance there, with its logins and settings.
 import { cookies } from 'next/headers';
+import { DownloadButton, DownloadModal } from './DownloadModal';
 
 export const grape = () => globalThis.grape;
 export const Ic = ({ name }) => <i className="ic" style={{ '--i': `url(/grape/icons/${name}.svg)` }} />;
@@ -32,13 +33,14 @@ export function Face({ user, size }) {
 /** The bar on top of every page: sticky, the links on the left, the person (or the way in) on the right. */
 export function Nav({ user, site, ready }) {
   return (
+    <>
     <header className="nav">
       <div className="nav-in">
         <a className="brand" href="/"><img src="/grape/logo.png" alt="" />Grape</a>
         <nav className="nav-links" aria-label="Sections">
           <a href="/#features">Features</a>
           <a href="/#plans">Plans</a>
-          <a href="/install">Download</a>
+          <DownloadButton disabled={!ready}>Download</DownloadButton>
           <a href="/#faq">Questions</a>
           {site.discord_url && <a href={site.discord_url} rel="noreferrer">Discord</a>}
         </nav>
@@ -48,9 +50,11 @@ export function Nav({ user, site, ready }) {
         ) : (
           <a className="pill dark" href="/login/discord?back=/"><Ic name="discord" />Log in</a>
         )}
-        <a className="pill light" href="/install" aria-disabled={!ready}>Download</a>
+        <DownloadButton className="pill light" disabled={!ready}>Download</DownloadButton>
       </div>
     </header>
+    <DownloadModal />
+    </>
   );
 }
 
