@@ -33,7 +33,7 @@ main() {
   npm run build --silent || fail "the website build"
 
   # the result goes live: code, built website and dependencies. data/ and payload/ belong to the server: never touched.
-  rsync -rlt --delete --exclude '/.git' --exclude '/data' --exclude '/payload' --exclude '/.next/cache' ./ "$LIVE/" || fail "copying to $LIVE"
+  rsync -rlt --omit-dir-times --no-perms --delete --exclude '/.git' --exclude '/data' --exclude '/payload' --exclude '/.next/cache' ./ "$LIVE/" || fail "copying to $LIVE"
   sudo -n /usr/bin/systemctl restart grape-server || fail "restarting the server"
 
   local i
